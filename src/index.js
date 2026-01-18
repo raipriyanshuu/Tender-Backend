@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import tendersRouter from './routes/tenders.js';
+import uploadRoutes from './routes/upload.js';
 
 // Load environment variables
 dotenv.config();
@@ -19,13 +20,15 @@ app.use(cors({
     }
     
     // List of allowed origins
-    const allowedOrigins = [
-      'http://localhost:5173',
-      'http://localhost:5174',
-      'http://localhost:5175',
-      'http://localhost:3000',
+
+      const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://tenderfrontend-three.vercel.app'
+];
+
       CORS_ORIGIN
-    ].filter(Boolean); // Remove any undefined values
+    .filter(Boolean); // Remove any undefined values
     
     // Always allow localhost in development (any port)
     if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
@@ -54,7 +57,9 @@ app.use((req, res, next) => {
   next();
 });
 
+
 // Routes
+app.use(uploadRouter); 
 app.use('/api/tenders', tendersRouter);
 
 // Root endpoint
