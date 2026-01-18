@@ -3,7 +3,8 @@ import multer from "multer";
 import axios from "axios";
 import FormData from "form-data";
 
-const router = express.app();
+const router = express.Router();
+
 const upload = multer(); // memory storage
 
 router.post("/upload-tender", upload.single("file"), async (req, res) => {
