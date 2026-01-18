@@ -1,0 +1,1885 @@
+{
+  "name": "Tender – File Ingestion dup",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{$json.id}}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -4896,
+        -64
+      ],
+      "id": "f57abfff-f52e-4187-868e-f6c0e8e3b8bf",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "HZ3ueK0fnrel1gnH",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c567104c-3468-47d8-847c-455e8af39cdd",
+              "name": "file_id",
+              "value": "={{$json.id}}",
+              "type": "string"
+            },
+            {
+              "id": "fb861dd6-0156-43a2-9a89-bdcf453cccd5",
+              "name": "file_name",
+              "value": "={{$json.name}}",
+              "type": "string"
+            },
+            {
+              "id": "9724702d-43b2-48e1-b5b5-b4648e3b696e",
+              "name": "mimeType",
+              "value": "={{$json.mimeType}}",
+              "type": "string"
+            },
+            {
+              "id": "d4762c83-717b-4847-9596-b85b983d7c07",
+              "name": "file_ext",
+              "value": "={{$json.name.split('.').pop().toLowerCase()}}",
+              "type": "string"
+            },
+            {
+              "id": "ea212a5f-0125-4720-a957-ffd5e0b5db1d",
+              "name": "binary_key",
+              "value": "\"data\"",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -4688,
+        -112
+      ],
+      "id": "60f7a22b-d1c6-4d73-bbb9-ca43f61588f6",
+      "name": "File Descriptor"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{$json.file_ext}}",
+                    "rightValue": "pdf|doc|docx|xls|xlsx",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    },
+                    "id": "ecd81543-919c-423f-9232-f41342aceb7c"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "dba8ba20-a051-4895-a36c-630e1fb428d2",
+                    "leftValue": "={{ $json.file_ext }}\n",
+                    "rightValue": "x83|d83|p83|gaeb",
+                    "operator": {
+                      "type": "string",
+                      "operation": "regex"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -4064,
+        -208
+      ],
+      "id": "efbc554a-1d51-4455-99d9-77281dabb95c",
+      "name": "File Type Router"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are classifying German tender line items.\n\nReturn ONLY valid JSON (no markdown, no extra keys) with this exact shape:\n\n{\n  \"batch_index\": <number>,\n  \"items\": [\n    {\"pos\": \"<string>\", \"is_rental\": true|false|null}\n  ]\n}\n\nRules for is_rental:\n- true  => Mietgebühr, Vorhaltung, pro Monat, monatlich, Abrechnung pro Monat, Wartung/Service recurring\n- false => Lieferung, Montage, Einbau, Demontage once, Pauschal once\n- null  => unclear from text\n\nBATCH_INDEX: {{$json.batch_index}}\n\nITEMS:\n{{ JSON.stringify($json.items) }}\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You extract structured tender info from German construction LV text. Output MUST be valid JSON only."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.8,
+      "position": [
+        -6192,
+        -1152
+      ],
+      "id": "8f6e1d6a-9618-46f1-8efe-01335e2521a2",
+      "name": "LLM: extract facts (chunk)"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -6128,
+        -928
+      ],
+      "id": "fa9e2812-dee6-4c9f-8ad9-ab6e442c929e",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0ACGBCG3JqeU5TI",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// CH05_parse_llm_text\n// Run once for each item → MUST return a SINGLE { json: {...} }\n\nconst raw = $json.text ?? $json.content ?? $json.response ?? null;\n\nfunction wrapToObject(v) {\n  if (v && typeof v === \"object\" && !Array.isArray(v)) return v;\n  if (Array.isArray(v)) return { items: v };\n  return { value: v ?? null };\n}\n\nif (raw === null || raw === undefined) {\n  return {\n    json: {\n      error: \"NO_TEXT_FIELD\",\n      gotKeys: Object.keys($json),\n      raw: $json,\n    },\n  };\n}\n\nconst t = String(raw).trim();\n\nif (!t) {\n  return {\n    json: {\n      error: \"EMPTY_TEXT\",\n      raw: $json,\n    },\n  };\n}\n\n// 1) direct parse\ntry {\n  return { json: wrapToObject(JSON.parse(t)) };\n} catch (_) {}\n\n// 2) slice first {...}\nconst i1 = t.indexOf(\"{\");\nconst i2 = t.lastIndexOf(\"}\");\nif (i1 !== -1 && i2 !== -1 && i2 > i1) {\n  try {\n    return { json: wrapToObject(JSON.parse(t.slice(i1, i2 + 1))) };\n  } catch (_) {}\n}\n\n// 3) slice first [...]\nconst a1 = t.indexOf(\"[\");\nconst a2 = t.lastIndexOf(\"]\");\nif (a1 !== -1 && a2 !== -1 && a2 > a1) {\n  try {\n    return { json: wrapToObject(JSON.parse(t.slice(a1, a2 + 1))) };\n  } catch (_) {}\n}\n\n// fallback\nreturn {\n  json: {\n    error: \"INVALID_JSON\",\n    raw: t,\n  },\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5840,
+        -1152
+      ],
+      "id": "eed7bac9-c2ec-492d-bdac-25fac2b2cbe0",
+      "name": "CH05_parse_llm_text"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CH08_prepare_summary_input (Run Once for All Items)\n\nconst MAX_ITEMS_FOR_SUMMARY = 50;\n\n// 1) Read ALL incoming items (this is the key fix)\nconst all = $input.all().map(i => i.json);\n\n// 2) Separate line items vs possible \"doc/meta/tender/rules\" carriers\n//    Some pipelines attach meta/tender/rules on one item, others don't.\n//    We'll search for them safely.\n\nconst firstWithDoc = all.find(x => x.doc) || null;\nconst firstWithMeta = all.find(x => x.meta) || null;\nconst firstWithTender = all.find(x => x.tender) || null;\nconst firstWithRules = all.find(x => x.rules) || null;\n\n// 3) Line items: in your case, every item IS a line item\n//    If later you wrap items under x.items, this still works.\nlet items = [];\nif (firstWithDoc?.doc?.items && Array.isArray(firstWithDoc.doc.items)) {\n  items = firstWithDoc.doc.items;\n} else {\n  items = all.filter(x => x.pos || x.position || x.short || x.long);\n}\n\n// Normalize item fields a bit (optional but helps frontend)\nitems = items.map(x => ({\n  pos: x.pos ?? x.position ?? null,\n  short: x.short ?? null,\n  long: x.long ?? x.description ?? null,\n  qty: x.qty ?? x.quantity ?? null,\n  unit: x.unit ?? null,\n  account: x.account ?? null,\n  is_rental: x.is_rental ?? x.rental ?? null,\n}));\n\n// 4) Pull meta/tender/rules (if present anywhere)\nconst meta =\n  firstWithDoc?.doc?.meta ??\n  firstWithMeta?.meta ??\n  null;\n\nconst tender =\n  firstWithDoc?.doc?.tender ??\n  firstWithTender?.tender ??\n  null;\n\nconst rules =\n  firstWithDoc?.doc?.rules ??\n  firstWithRules?.rules ??\n  { deadlines: [], standards: [], constraints: [] };\n\n// Ensure arrays exist\nrules.deadlines = Array.isArray(rules.deadlines) ? rules.deadlines : [];\nrules.standards = Array.isArray(rules.standards) ? rules.standards : [];\nrules.constraints = Array.isArray(rules.constraints) ? rules.constraints : [];\n\n// 5) Stats\nconst stats = {\n  total_items: items.length,\n  rental_items: items.filter(x => x.is_rental === true).length,\n  one_time_items: items.filter(x => x.is_rental === false).length,\n  unknown_rental_flag: items.filter(x => x.is_rental === null || x.is_rental === undefined).length,\n};\n\n// 6) Sample items for summary prompt (keep short to save tokens)\nconst sample_items = items.slice(0, MAX_ITEMS_FOR_SUMMARY);\n\n// 7) Final payload for summary LLM\nconst compact = {\n  meta,\n  tender,\n  rules: {\n    deadlines: rules.deadlines.slice(0, 30),\n    standards: rules.standards.slice(0, 30),\n    constraints: rules.constraints.slice(0, 60),\n  },\n  stats,\n  sample_items,\n};\n\nreturn [{ json: compact }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5552,
+        -1152
+      ],
+      "id": "b769f68d-9667-4399-9053-70007af59d1d",
+      "name": "CH08_prepare_summary_input"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are given a JSON object called tender_json.\n\nReturn ONLY a valid JSON object (no markdown, no code fences, no extra keys).\nDo NOT wrap JSON in a string.\n\ntender_json:\n{{ JSON.stringify($json) }}\n\nCreate a frontend-ready summary with this exact shape:\n\n{\n  \"overview\": {\n    \"one_liner\": string,\n    \"scope_summary\": string\n  },\n  \"highlights\": {\n    \"good_points\": string[],\n    \"bad_points\": string[]\n  },\n  \"key_requirements\": string[],\n  \"deadlines\": { \"label\": string, \"date\": string }[],\n  \"risks\": { \"severity\": \"low\"|\"medium\"|\"high\", \"title\": string, \"why\": string }[],\n  \"numbers\": {\n    \"items_total\": number,\n    \"rental_items\": number,\n    \"one_time_items\": number,\n    \"unknown_rental_flag\": number\n  },\n  \"top_items\": {\n    \"pos\": string,\n    \"short\": string,\n    \"qty\": number|null,\n    \"unit\": string|null,\n    \"is_rental\": boolean|null\n  }[]\n}\n\nRules:\n- Use ONLY tender_json. If something is missing, use null/[] and mention it in bad_points or risks.\n- Derive \"numbers\" from tender_json.stats.\n- \"top_items\" should use the first 10 items from tender_json.sample_items.\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Return only valid JSON. No markdown."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.8,
+      "position": [
+        -5264,
+        -1248
+      ],
+      "id": "a67db335-1324-430c-b8b2-859f34feb5d9",
+      "name": "Basic LLM Chain2"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_schema",
+              "schema": "{\n    \"type\": \"object\",\n    \"additionalProperties\": false,\n    \"properties\": {\n      \"overview\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"properties\": {\n          \"one_liner\": { \"type\": \"string\" },\n          \"project\": { \"type\": [\"string\", \"null\"] },\n          \"client\": { \"type\": [\"string\", \"null\"] },\n          \"site_address\": { \"type\": [\"string\", \"null\"] },\n          \"trade\": { \"type\": \"array\", \"items\": { \"type\": \"string\" } },\n          \"scope_summary\": { \"type\": \"string\" }\n        },\n        \"required\": [\"one_liner\", \"project\", \"client\", \"site_address\", \"trade\", \"scope_summary\"]\n      },\n      \"deadlines\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"additionalProperties\": false,\n          \"properties\": {\n            \"label\": { \"type\": \"string\" },\n            \"date\": { \"type\": \"string\" }\n          },\n          \"required\": [\"label\", \"date\"]\n        }\n      },\n      \"key_constraints\": {\n        \"type\": \"array\",\n        \"items\": { \"type\": \"string\" }\n      },\n      \"what_is_required\": {\n        \"type\": \"array\",\n        \"items\": { \"type\": \"string\" }\n      },\n      \"good_points\": {\n        \"type\": \"array\",\n        \"items\": { \"type\": \"string\" }\n      },\n      \"bad_points\": {\n        \"type\": \"array\",\n        \"items\": { \"type\": \"string\" }\n      },\n      \"risk_flags\": {\n        \"type\": \"array\",\n        \"items\": {\n          \"type\": \"object\",\n          \"additionalProperties\": false,\n          \"properties\": {\n            \"severity\": { \"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\"] },\n            \"title\": { \"type\": \"string\" },\n            \"why\": { \"type\": \"string\" }\n          },\n          \"required\": [\"severity\", \"title\", \"why\"]\n        }\n      },\n      \"numbers_overview\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"properties\": {\n          \"items_total\": { \"type\": \"integer\" },\n          \"rental_items\": { \"type\": \"integer\" },\n          \"one_time_items\": { \"type\": \"integer\" },\n          \"unknown_rental_flag\": { \"type\": \"integer\" }\n        },\n        \"required\": [\"items_total\", \"rental_items\", \"one_time_items\", \"unknown_rental_flag\"]\n      },\n      \"next_actions\": {\n        \"type\": \"array\",\n        \"items\": { \"type\": \"string\" }\n      }\n    },\n    \"required\": [\n      \"overview\",\n      \"deadlines\",\n      \"key_constraints\",\n      \"what_is_required\",\n      \"good_points\",\n      \"bad_points\",\n      \"risk_flags\",\n      \"numbers_overview\",\n      \"next_actions\"\n    ]\n  }\n\n"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -5200,
+        -1024
+      ],
+      "id": "a2498852-72e0-4cc4-9e3b-efb21bf17494",
+      "name": "OpenAI Chat Model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0ACGBCG3JqeU5TI",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.text;\n\n// If it's already an object, pass through\nif (raw && typeof raw === 'object') {\n  return [{ json: raw }];\n}\n\n// Try parse JSON inside text\ntry {\n  const cleaned = String(raw)\n    .replace(/^```json\\s*/i, '')\n    .replace(/^```\\s*/i, '')\n    .replace(/```$/i, '')\n    .trim();\n\n  return [{ json: JSON.parse(cleaned) }];\n} catch (e) {\n  // fallback: return original for debugging\n  return [{ json: { error: \"Could not parse model output\", raw } }];\n}\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4912,
+        -1152
+      ],
+      "id": "8e60edc8-1cdf-4f8e-af1c-9e5c3c3678a1",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://avacloud-api.dangl-it.com/conversion/gaeb/excel",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "WritePrices",
+              "value": "false"
+            },
+            {
+              "name": "WriteLongTexts",
+              "value": "true"
+            },
+            {
+              "name": "ConversionCulture",
+              "value": "de"
+            },
+            {
+              "name": "IncludeArticleNumbers",
+              "value": "true"
+            },
+            {
+              "name": "OutputHtmlAsXml",
+              "value": "true"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": " multipart/form-data"
+            },
+            {
+              "name": "accept",
+              "value": "text/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJSUzI1NiIsImtpZCI6IkFFM0M1RUM0Q0I0MkIzQkNCNTM1RjQ1NEFGOUQ5OTZEOEYxRTg2MkJSUzI1NiIsIng1dCI6InJqeGV4TXRDczd5MU5mUlVyNTJaYlk4ZWhpcyIsInR5cCI6ImF0K2p3dCJ9.eyJpc3MiOiJodHRwczovL2lkZW50aXR5LmRhbmdsLWl0LmNvbSIsIm5iZiI6MTc2ODY2NTExNCwiaWF0IjoxNzY4NjY1MTE0LCJleHAiOjE3Njg2Njg3MTQsImF1ZCI6ImF2YWNsb3VkIiwic2NvcGUiOlsiYXZhY2xvdWQiXSwiYW1yIjpbInB3ZCJdLCJjbGllbnRfaWQiOiI1ZTk4NDIzZi0zNTAwLTRiYzMtYjNiNy05Yjg5NDc4ZDk2NDAiLCJzdWIiOiI1MDgyMmZjOS03MTcyLTRiYWYtMjkyOS0wOGRlNGY3YTI1NzQiLCJhdXRoX3RpbWUiOjE3Njg2MjE3NjIsImlkcCI6ImxvY2FsIiwiZW1haWwiOiJwcml5YW5zaHVyYWkwODE3QGdtYWlsLmNvbSIsImF2YWNsb3VkX3VzZXJfYWNjZXNzIjoiMjAyNi0wMi0xNVQwNTozODoyNS41Njg1NDEyXHUwMDJCMDA6MDAiLCJyb2xlIjoiRGV2ZWxvcGVyIiwiaWRlbnRpY29uX2lkIjoiZDljZjQyNjctOGM0NS00ZmJiLTlkN2ItYjM4M2Y1NmNlZmJkIiwicHJlZmVycmVkX3VzZXJuYW1lIjoicHJpeWFuc2h1MTgiLCJuYW1lIjoicHJpeWFuc2h1MTgiLCJlbWFpbF92ZXJpZmllZCI6ZmFsc2UsInNpZCI6IjRCMEQ5QzU0QkY2RjE5NTZGNERDNUNCMUQwQ0E3QTI3In0.29FIapRRtG2Sn3c0ZD_2woGVbfk1cuInG2CSxmRMCZML4Xu4T7zb3Cho5ZDVkHyYXYlF2swxOE7DQoglH3iHmWoTWiLS5MlRkwVppx0lECjR6axADziJZbWEWOtvEzXQjXqyU5b3GbrwF41xHLAiWSkvkbpkDoitamZz-GY_Q1QzL8Yig-Ic9G8E8kS_Qjj8oXdAb6Fp0o3hLKt67ADMaw8Z054ocsTjF4T8LlQQ7nYfRI8qYKUymGsIyGDYXpIPQV85yl5SAjTrcgmXXs7HtW-c7JMKN6rdG7lznL9JPFN2AaYjHmSKztR-JDq0pQf0T2HvYDYtbLpXQbu5aO2sPaeBAiqGZaVsZFYdLkMdkYQfmuj0VvZ22rmAWeo5KWi4ttBhOhimXQ5wtUdsHHnk4ECOcx5pDpMmct8u3NMSzEN_Ze0J0NW7KyL5tve7z7drdIFzvcgiFR4KQ6FZPaQlEq_tAMisDN9NHTXBDEf1Bssrv8Xkff7YrCDQJdiVTn4_2dv5gIUn6oyVD0B8_agPkIArrPayoZYivUzC3MQqvVvg_1ceSCLc6LIlolkmuixJQhlRhY2HnHYjfrU5knhu6q4pTowJ4H45Fk6FkIT7gSYvpvbPj7ZXCway7TdeiTqzYWYgxdC4MDcg4YGl_zo4LDMUCzfSOldV4Ci2Yb68XE0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "gaebFile",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -4064,
+        256
+      ],
+      "id": "d31a7a07-4b1e-475c-9b78-817e9958111c",
+      "name": "GAEB_to_Excel_AvaCloud"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are analyzing a CHUNK of tender rules text.\n\nContext:\n- This text contains legal, procedural, or compliance-related tender rules\n- This is NOT a Bill of Quantities\n- This is NOT pricing data\n- Extract ONLY what is explicitly stated\n\nThis is chunk {{ $json.chunk_index + 1 }} of {{ $json.chunk_total }}.\nDo NOT assume information from other chunks.\n\nTEXT:\n{{ JSON.stringify($json.rules_chunk) }}\n\nRETURN STRICTLY THIS JSON STRUCTURE:\n\n{\n  \"summary\": string,\n\n  \"deadlines\": [\n    {\n      \"type\": \"submission | questions | site_visit | other\",\n      \"date\": \"YYYY-MM-DD | null\",\n      \"time\": \"HH:MM | null\",\n      \"timezone\": \"string | null\",\n      \"evidence\": \"string\"\n    }\n  ],\n\n  \"required_documents\": [\n    {\n      \"name\": \"string\",\n      \"mandatory\": true,\n      \"evidence\": \"string\"\n    }\n  ],\n\n  \"eligibility_criteria\": [\n    {\n      \"criterion\": \"string\",\n      \"evidence\": \"string\"\n    }\n  ],\n\n  \"submission_method\": {\n    \"method\": \"portal | email | post | other | null\",\n    \"details\": \"string\",\n    \"evidence\": \"string\"\n  },\n\n  \"bid_validity\": {\n    \"duration_days\": number | null,\n    \"evidence\": \"string\"\n  },\n\n  \"bonds_guarantees\": [\n    {\n      \"type\": \"bid | performance | warranty | other\",\n      \"amount\": \"string | null\",\n      \"evidence\": \"string\"\n    }\n  ],\n\n  \"penalties\": [\n    {\n      \"type\": \"delay | quality | other\",\n      \"details\": \"string\",\n      \"evidence\": \"string\"\n    }\n  ],\n\n  \"subcontracting\": {\n    \"allowed\": true | false | null,\n    \"details\": \"string\",\n    \"evidence\": \"string\"\n  },\n\n  \"payment_terms\": {\n    \"details\": \"string\",\n    \"evidence\": \"string\"\n  },\n\n  \"risks\": [\n    {\n      \"severity\": \"low | medium | high\",\n      \"risk\": \"string\",\n      \"evidence\": \"string\"\n    }\n  ]\n}\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a senior tender compliance and contract analyst.  You analyze ONLY tender rules, conditions, and procedural text (such as submission rules, deadlines, eligibility, guarantees, penalties).  STRICT RULES: - Return ONLY valid JSON - Do NOT include markdown, explanations, or comments - Do NOT invent information - If information is missing, use null or empty arrays - Every extracted item MUST include evidence quoted from the text - Evidence must be a short exact quote (max ~20 words)"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -5616,
+        -848
+      ],
+      "id": "cabbb01d-c5dd-4fd8-a5d0-5f0a79fcc874",
+      "name": "Basic LLM Chain1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-5-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -5552,
+        -624
+      ],
+      "id": "a0f301a6-a6ad-4409-bc3b-20fdb37d9d17",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0ACGBCG3JqeU5TI",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function extractJson(text) {\n  if (!text) return null;\n  let s = String(text).trim();\n\n  // strip ```json fences\n  s = s.replace(/^```json\\s*/i, \"\").replace(/^```\\s*/i, \"\").replace(/```$/i, \"\").trim();\n\n  // try extracting first {...}\n  const a = s.indexOf(\"{\");\n  const b = s.lastIndexOf(\"}\");\n  if (a >= 0 && b > a) s = s.slice(a, b + 1);\n\n  try { return JSON.parse(s); } catch { return null; }\n}\n\nconst raw = $json.text || $json.output || $json.message || \"\";\nconst parsed = extractJson(raw);\n\nreturn {\n  ...$json,\n  parsed_ok: !!parsed,\n  rules_extraction: parsed,\n  _raw_llm: raw\n};\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5200,
+        -848
+      ],
+      "id": "1d86a392-8a32-4454-b0f3-cb26c14212e2",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const x = $json.rules_extraction;\n\nif (!x) {\n  return { json: { ok: false, error: \"No parsed rules_extraction\", raw: ($json._raw_llm||\"\").slice(0,2000) } };\n}\n\nfunction cleanStr(v) {\n  if (v == null) return \"\";\n  return String(v).replace(/\\s+/g, \" \").trim();\n}\n\nfunction normDate(v) {\n  const s = cleanStr(v);\n  // keep as-is if already YYYY-MM-DD, else null\n  return /^\\d{4}-\\d{2}-\\d{2}$/.test(s) ? s : (s ? s : null);\n}\n\nfunction normTime(v) {\n  const s = cleanStr(v);\n  return /^\\d{2}:\\d{2}$/.test(s) ? s : (s ? s : null);\n}\n\nfunction uniqBy(arr, sigFn) {\n  const out = [];\n  const seen = new Set();\n  for (const a of (arr || [])) {\n    const sig = sigFn(a);\n    if (!sig || seen.has(sig)) continue;\n    seen.add(sig);\n    out.push(a);\n  }\n  return out;\n}\n\n// Normalize arrays\nconst deadlines = uniqBy(x.deadlines, d =>\n  [cleanStr(d?.type), normDate(d?.date), normTime(d?.time), cleanStr(d?.evidence)].join(\"|\").toLowerCase()\n).map(d => ({\n  type: cleanStr(d.type) || \"other\",\n  date: normDate(d.date),\n  time: normTime(d.time),\n  timezone: cleanStr(d.timezone) || null,\n  evidence: cleanStr(d.evidence)\n}));\n\nconst required_documents = uniqBy(x.required_documents, d =>\n  [cleanStr(d?.name), String(!!d?.mandatory), cleanStr(d?.evidence)].join(\"|\").toLowerCase()\n).map(d => ({\n  name: cleanStr(d.name),\n  mandatory: d.mandatory !== false, // default true if missing\n  evidence: cleanStr(d.evidence)\n}));\n\nconst eligibility_criteria = uniqBy(x.eligibility_criteria, d =>\n  [cleanStr(d?.criterion), cleanStr(d?.evidence)].join(\"|\").toLowerCase()\n).map(d => ({\n  criterion: cleanStr(d.criterion),\n  evidence: cleanStr(d.evidence)\n}));\n\nconst risks = uniqBy(x.risks, r =>\n  [cleanStr(r?.severity), cleanStr(r?.risk), cleanStr(r?.evidence)].join(\"|\").toLowerCase()\n).map(r => ({\n  severity: (cleanStr(r.severity) || \"medium\").toLowerCase(),\n  risk: cleanStr(r.risk),\n  evidence: cleanStr(r.evidence)\n}));\n\n// Compute a simple score\nconst severityScore = (s) => s === \"high\" ? 3 : s === \"low\" ? 1 : 2;\nconst risk_score = risks.reduce((acc, r) => acc + severityScore(r.severity), 0);\n\n// Build “cards” for frontend\nconst cards = [\n  ...deadlines.map(d => ({\n    type: \"deadline\",\n    title: `Deadline: ${d.type}`,\n    subtitle: [d.date, d.time, d.timezone].filter(Boolean).join(\" \"),\n    evidence: d.evidence\n  })),\n  ...required_documents.map(d => ({\n    type: \"document\",\n    title: d.name,\n    subtitle: d.mandatory ? \"Mandatory\" : \"Optional\",\n    evidence: d.evidence\n  })),\n  ...risks.map(r => ({\n    type: \"risk\",\n    title: `Risk (${r.severity})`,\n    subtitle: r.risk,\n    evidence: r.evidence\n  }))\n].slice(0, 80);\n\nconst pretty = {\n  summary: cleanStr(x.summary),\n  overview: {\n    risk_score,\n    deadlines_count: deadlines.length,\n    required_documents_count: required_documents.length,\n    risks_count: risks.length\n  },\n  deadlines,\n  required_documents,\n  eligibility_criteria,\n  submission_method: {\n    method: cleanStr(x.submission_method?.method) || null,\n    details: cleanStr(x.submission_method?.details),\n    evidence: cleanStr(x.submission_method?.evidence)\n  },\n  bid_validity: {\n    duration_days: Number.isFinite(Number(x.bid_validity?.duration_days)) ? Number(x.bid_validity.duration_days) : null,\n    evidence: cleanStr(x.bid_validity?.evidence)\n  },\n  bonds_guarantees: (x.bonds_guarantees || []).map(b => ({\n    type: cleanStr(b.type) || \"other\",\n    amount: cleanStr(b.amount) || null,\n    evidence: cleanStr(b.evidence)\n  })),\n  penalties: (x.penalties || []).map(p => ({\n    type: cleanStr(p.type) || \"other\",\n    details: cleanStr(p.details),\n    evidence: cleanStr(p.evidence)\n  })),\n  subcontracting: {\n    allowed: (x.subcontracting?.allowed === true) ? true : (x.subcontracting?.allowed === false ? false : null),\n    details: cleanStr(x.subcontracting?.details),\n    evidence: cleanStr(x.subcontracting?.evidence)\n  },\n  payment_terms: {\n    details: cleanStr(x.payment_terms?.details),\n    evidence: cleanStr(x.payment_terms?.evidence)\n  },\n  risks,\n  cards\n};\n\nreturn { json: { ok: true, rules_pretty: pretty } };\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4912,
+        -848
+      ],
+      "id": "f10c1ec6-046d-44ae-b65b-d62b3a7413de",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {
+          "includeUnpaired": true
+        }
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -4688,
+        -992
+      ],
+      "id": "13ce91b1-849c-4b3d-960e-3d7e7b88d736",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://extraction-api.nanonets.com/api/v1/extract/async",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer fa0f7036-f2ea-11f0-990c-52377b697aac"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "output_format",
+              "value": "json"
+            },
+            {
+              "name": "run_id",
+              "value": "={{$json.run_id}}"
+            },
+            {
+              "name": "doc_id",
+              "value": "={{$json.doc_id}}"
+            },
+            {
+              "name": "file_type",
+              "value": "={{$json.file_type}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -3744,
+        -432
+      ],
+      "id": "47e8b139-66d3-42b2-90f4-79ce62ad6043",
+      "name": "HTTP Request",
+      "alwaysOutputData": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// Input item JSON\nconst res = $json;\n\n// ---- helpers ----\nfunction firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\n// ---- Preserve metadata (general) ----\nconst run_id = firstNonEmpty(res.run_id, res.runId, res._meta?.run_id);\nconst doc_id = firstNonEmpty(res.doc_id, res.document_id, res.file_id, res.fileId, res.id, res._meta?.doc_id);\nconst file_name = firstNonEmpty(res.file_name, res.filename, res.name, res.fileName, res._meta?.file_name);\nconst file_type = firstNonEmpty(res.file_type, res.mimeType, res.type, res._meta?.file_type);\nconst status = firstNonEmpty(res.status, res.state);\n\n// ---- Nanonets content ----\nconst content =\n  res?.result?.json?.content ??\n  res?.result?.content ??\n  res?.content ??\n  {};\n\n// Build readable text from all string fields\nconst textParts = [];\nfor (const [key, val] of Object.entries(content)) {\n  if (typeof val === \"string\" && val.trim()) {\n    textParts.push(`${key}: ${val.trim()}`);\n  }\n}\n\nconst doc = {\n  fileName: file_name || content?.document_title || String(res?.record_id || \"unknown\"),\n  mimeType: file_type || $binary?.data?.mimeType || \"unknown\",\n  text: textParts.join(\"\\n\\n\"),\n  tables_md: \"\",\n  pages: [],\n  raw: content,\n};\n\n// ✅ Return ONE item (array) + preserve binary\nreturn [\n  {\n    json: {\n      ...(res || {}),     // keep everything you already had\n      run_id,\n      doc_id,\n      file_name,\n      file_type,\n      status,\n      doc,                // <--- you were missing this in output\n    },\n    binary: $binary,      // preserve binary (if present)\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2272,
+        -128
+      ],
+      "id": "12ce9433-2555-4f71-9324-5de208be0008",
+      "name": "Code in JavaScript11"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=SYSTEM\nDu bist ein Extraktionssystem für Vergabeunterlagen. Du gibst ausschließlich gültiges JSON zurück (keine Erklärungen, kein Markdown).\nWICHTIG: Niemals raten oder erfinden. Wenn etwas nicht eindeutig im Text steht, gib null oder [] zurück.\n\nUSER\nZIEL\nExtrahiere aus dem Dokumenttext nur Informationen, die für die Angebotsentscheidung und die UI relevant sind:\n- Muss-Anforderungen (mandatory_requirements)\n- Operative Anforderungen (operational_requirements)\n- Vertrags-/Kommerzielle Punkte (penalties)\n- Zuschlags-/Bewertungslogik (award_logic)\n- Risiken (risks)\n\nDOKUMENT-KLASSIFIKATION\nBestimme doc_type und doc_relevance:\n- tender_spec: technische Leistungsbeschreibung / LV / Anforderungen (Relevanz 80–100)\n- award_criteria: Zuschlagskriterien, Bewertungsmatrix (Relevanz 70–100)\n- contract_terms: Vertragsbedingungen, AGB, Vertragsstrafen (Relevanz 60–90)\n- forms_privacy: Datenschutzinformation (Relevanz 0–20)\n- forms_general: Formblätter/Eigenerklärungen ohne harte Anforderungen (Relevanz 10–40)\n- unknown: nicht klar (Relevanz 0–50)\n\nHONESTY RULES\n- Wenn keine Anforderungen/Strafen/Matrix im Text: gib [] bzw. null zurück.\n- Extrahiere tender_id nur, wenn im Text erkennbar (z.B. \"Vergabenummer: ...\").\n- Evidence muss doc_id + filename + page enthalten.\n- Verwende kurze, präzise deutsche Sätze.\n\nINPUT META\ndoc_id: {{$json.doc_id}}\nfilename: {{$json.filename}}\npage_number: {{$json.page_number ?? null}}\ntotal_pages: {{$json.total_pages ?? null}}\n\nDOKUMENTTEXT\n{{ $json.chunk_text }}\n{{ $json.chunk_text }}\n\nOUTPUT JSON (genau dieses Schema, keine zusätzlichen Keys)\n{\n  \"doc_meta\": {\n    \"tender_id\": null,\n    \"doc_type\": \"unknown\",\n    \"doc_relevance\": 0,\n    \"language\": \"de\"\n  },\n  \"extraction_warnings_de\": [],\n  \"mandatory_requirements\": [],\n  \"operational_requirements\": [],\n  \"commercials\": { \"penalties\": [] },\n  \"award_logic\": {\n    \"matrix_de\": null,\n    \"price_weight_percent\": 0,\n    \"quality_weight_percent\": 0,\n    \"other_de\": null,\n    \"evidence\": []\n  },\n  \"risks\": []\n}\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a strict tender extraction engine. Extract ONLY facts explicitly present in the given chunk. Return ONLY valid JSON. No markdown. No explanations. If a field is not present in this chunk, set it to null or []. Do not invent. Do not infer."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -1168,
+        -128
+      ],
+      "id": "965c0bec-ecb6-4ab3-9f42-314d90f1508e",
+      "name": "Basic LLM Chain3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.1",
+          "mode": "list",
+          "cachedResultName": "gpt-5.1"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -1152,
+        208
+      ],
+      "id": "dbf1d346-0b32-4928-9442-f63c2e5867b7",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0ACGBCG3JqeU5TI",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\nfunction extractJsonCandidate(str) {\n  if (!str || typeof str !== 'string') return '';\n\n  let s = str.trim();\n\n  // Remove ```json fences if present\n  s = s.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n\n  // If there's text around JSON, take the largest {...} block\n  const start = s.indexOf('{');\n  const end = s.lastIndexOf('}');\n  if (start === -1 || end === -1 || end <= start) return '';\n\n  return s.slice(start, end + 1).trim();\n}\n\nfunction safeJsonParse(s) {\n  // Try normal parse first\n  try {\n    return { ok: true, value: JSON.parse(s) };\n  } catch (e1) {\n    // Try common cleanup: trailing commas\n    try {\n      const cleaned = s\n        .replace(/,\\s*}/g, '}')\n        .replace(/,\\s*]/g, ']');\n      return { ok: true, value: JSON.parse(cleaned) };\n    } catch (e2) {\n      return { ok: false, error: String(e2?.message || e2) };\n    }\n  }\n}\n\n// ---- INPUTS ----\n// You said this node input contains:\n// { _meta: {...}, extracted_json: {...} } OR { text: \"LLM output...\" }\nconst meta = $json._meta ?? {};\n\nconst run_id = firstNonEmpty(meta.run_id, $json.run_id, $json.runId);\nconst doc_id = firstNonEmpty(meta.doc_id, $json.doc_id, $json.file_id, $json.id);\nconst file_id = firstNonEmpty(meta.file_id, $json.file_id, $json.id);\nconst file_name = firstNonEmpty(meta.file_name, $json.file_name, $json.filename, $json.name);\nconst file_type = firstNonEmpty(meta.file_type, $json.file_type, $json.mimeType);\n\n// If you already have extracted_json as object, use it directly:\nlet extracted = $json.extracted_json;\n\n// Otherwise parse from LLM raw text fields:\nif (!extracted || typeof extracted !== 'object') {\n  const raw =\n    $json.text ??\n    $json.output ??\n    $json.response ??\n    $json.data ??\n    '';\n\n  const candidate = extractJsonCandidate(raw);\n  if (!candidate) {\n    return {\n      json: {\n        _meta: { run_id, doc_id, file_id, file_name, file_type },\n        ok: false,\n        error: 'No JSON object found in LLM output',\n        raw_text: raw\n      }\n    };\n  }\n\n  const parsed = safeJsonParse(candidate);\n  if (!parsed.ok) {\n    return {\n      json: {\n        _meta: { run_id, doc_id, file_id, file_name, file_type },\n        ok: false,\n        error: 'Failed to parse JSON: ' + parsed.error,\n        raw_text: raw,\n        json_candidate: candidate\n      }\n    };\n  }\n\n  extracted = parsed.value;\n}\n\n// ✅ Final output\nreturn {\n  json: {\n    _meta: { run_id, doc_id, file_id, file_name, file_type },\n    ok: true,\n    extracted_json: extracted,\n    tender_id: extracted?.tender_id ?? null\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -864,
+        -464
+      ],
+      "id": "a50bc2ad-12d7-405a-90bc-f26cf57aded1",
+      "name": "Code in JavaScript12"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "function firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\nfunction extractJsonCandidate(str) {\n  if (!str || typeof str !== 'string') return '';\n\n  let s = str.trim();\n\n  // Remove ```json fences if present\n  s = s.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/```$/i, '').trim();\n\n  // If there's text around JSON, take the largest {...} block\n  const start = s.indexOf('{');\n  const end = s.lastIndexOf('}');\n  if (start === -1 || end === -1 || end <= start) return '';\n\n  return s.slice(start, end + 1).trim();\n}\n\nfunction safeJsonParse(s) {\n  // Try normal parse first\n  try {\n    return { ok: true, value: JSON.parse(s) };\n  } catch (e1) {\n    // Try common cleanup: trailing commas\n    try {\n      const cleaned = s\n        .replace(/,\\s*}/g, '}')\n        .replace(/,\\s*]/g, ']');\n      return { ok: true, value: JSON.parse(cleaned) };\n    } catch (e2) {\n      return { ok: false, error: String(e2?.message || e2) };\n    }\n  }\n}\n\n// ---- INPUTS ----\n// You said this node input contains:\n// { _meta: {...}, extracted_json: {...} } OR { text: \"LLM output...\" }\nconst meta = $json._meta ?? {};\n\nconst run_id = firstNonEmpty(meta.run_id, $json.run_id, $json.runId);\nconst doc_id = firstNonEmpty(meta.doc_id, $json.doc_id, $json.file_id, $json.id);\nconst file_id = firstNonEmpty(meta.file_id, $json.file_id, $json.id);\nconst file_name = firstNonEmpty(meta.file_name, $json.file_name, $json.filename, $json.name);\nconst file_type = firstNonEmpty(meta.file_type, $json.file_type, $json.mimeType);\n\n// If you already have extracted_json as object, use it directly:\nlet extracted = $json.extracted_json;\n\n// Otherwise parse from LLM raw text fields:\nif (!extracted || typeof extracted !== 'object') {\n  const raw =\n    $json.text ??\n    $json.output ??\n    $json.response ??\n    $json.data ??\n    '';\n\n  const candidate = extractJsonCandidate(raw);\n  if (!candidate) {\n    return {\n      json: {\n        _meta: { run_id, doc_id, file_id, file_name, file_type },\n        ok: false,\n        error: 'No JSON object found in LLM output',\n        raw_text: raw\n      }\n    };\n  }\n\n  const parsed = safeJsonParse(candidate);\n  if (!parsed.ok) {\n    return {\n      json: {\n        _meta: { run_id, doc_id, file_id, file_name, file_type },\n        ok: false,\n        error: 'Failed to parse JSON: ' + parsed.error,\n        raw_text: raw,\n        json_candidate: candidate\n      }\n    };\n  }\n\n  extracted = parsed.value;\n}\n\n// ✅ Final output\nreturn {\n  json: {\n    _meta: { run_id, doc_id, file_id, file_name, file_type },\n    ok: true,\n    extracted_json: extracted,\n    tender_id: extracted?.tender_id ?? null\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -672,
+        -480
+      ],
+      "id": "844a9c27-0ec3-4a51-ac1e-4932dd5c04b5",
+      "name": "Code in JavaScript13"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -6192,
+        160
+      ],
+      "id": "16ee591d-d9db-4c6d-92cf-1f30b0474226",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "'1_8NYYrbxTYytbHvS2F9qFlKW5Fd1BQTw' in parents and trashed = false",
+        "returnAll": true,
+        "filter": {},
+        "options": {
+          "fields": [
+            "id",
+            "mimeType",
+            "name",
+            "kind"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -5744,
+        160
+      ],
+      "id": "cf116b1b-bbc8-4e0a-a3e8-897c7c6a897a",
+      "name": "Search files and folders1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "HZ3ueK0fnrel1gnH",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5184,
+        144
+      ],
+      "id": "466ec468-4bce-47db-b641-28f284c6859e",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.file_extractions\n(run_id, source, doc_id, filename, file_type, extracted_json, status, error, updated_at)\nVALUES\n($1, 'gdrive', $2, $3, $4, $5::jsonb, $6, $7, NOW())\nON CONFLICT (doc_id)\nDO UPDATE SET\n  run_id = EXCLUDED.run_id,\n  filename = EXCLUDED.filename,\n  file_type = EXCLUDED.file_type,\n  extracted_json = EXCLUDED.extracted_json,\n  status = EXCLUDED.status,\n  error = EXCLUDED.error,\n  updated_at = NOW();\n",
+        "options": {
+          "queryReplacement": "={{$json.run_id}},{{$json.doc_id}},{{$json.file_name}},{{$json.tender_id}},{{ JSON.stringify($json.extracted_json) }},{{$json.ok}},{{$json.error}}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -256,
+        -16
+      ],
+      "id": "56464cea-adb1-4d80-b55b-da6322db95fb",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "jwwhJVc5vm3KZbqZ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    run_id: $execution.id\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5968,
+        160
+      ],
+      "id": "783df82b-3388-4389-bbb5-1d1e8c76eb0c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "file_extractions",
+          "mode": "list",
+          "cachedResultName": "file_extractions"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "run_id",
+              "value": "={{ $json.run_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -4752,
+        624
+      ],
+      "id": "84e032cc-707b-433e-8237-839d85f18c33",
+      "name": "Select rows from a table",
+      "credentials": {
+        "postgres": {
+          "id": "jwwhJVc5vm3KZbqZ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const runId = $('Code in JavaScript').first().json.run_id\n\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    run_id: runId\n  },\n  binary: item.binary\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5520,
+        160
+      ],
+      "id": "dcc30e78-2003-44da-ad6b-2b980889f3d6",
+      "name": "Attach run_id to files"
+    },
+    {
+      "parameters": {
+        "jsCode": "function firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\nreturn items.map(item => {\n  const j = item.json ?? {};\n\n  const run_id = firstNonEmpty(\n    j.run_id,\n    j.runId,\n    j.execution_id,\n    $execution.id\n  );\n\n  const doc_id = firstNonEmpty(\n    j.doc_id,\n    j.docId,\n    j.file_id,\n    j.fileId,\n    j.id\n  );\n\n  const filename = firstNonEmpty(\n    j.file_name,\n    j.filename,\n    j.name,\n    j.fileName\n  );\n\n  const file_type = firstNonEmpty(\n    j.mimeType,\n    j.file_type,\n    j.fileType,\n    j.file_ext,\n    j.extension\n  );\n\n  // Try to find extraction payload too (optional)\n  const extracted_json = firstNonEmpty(\n    j.extracted_json,\n    j.extraction,\n    j.extraction_result,\n    j.result,\n    j.output,\n    j.data\n  );\n\n  const status = firstNonEmpty(j.status, j.state) ?? 'SUCCESS';\n  const error = firstNonEmpty(j.error, j.err, j.message);\n\n  return {\n    json: {\n      ...j,              // keep everything you already had\n      run_id,\n      doc_id,\n      filename,\n      file_type,\n      extracted_json,    // keep stable key (even if null)\n      status,\n      error\n    },\n    binary: item.binary  // keep file binary if present\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4496,
+        -128
+      ],
+      "id": "655e4e5c-9779-4db8-86e4-5d893fdf8138",
+      "name": "Normalize meta"
+    },
+    {
+      "parameters": {
+        "jsCode": "function firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\nreturn items.map(item => {\n  const j = item.json ?? {};\n\n  const run_id = firstNonEmpty(\n    j.run_id,\n    j.runId,\n    j.execution_id,\n    $execution.id\n  );\n\n  const doc_id = firstNonEmpty(\n    j.doc_id,\n    j.docId,\n    j.file_id,\n    j.fileId,\n    j.id\n  );\n\n  const filename = firstNonEmpty(\n    j.file_name,\n    j.filename,\n    j.name,\n    j.fileName\n  );\n\n  const file_type = firstNonEmpty(\n    j.mimeType,\n    j.file_type,\n    j.fileType,\n    j.file_ext,\n    j.extension\n  );\n\n  // Optional: if you want stable keys for DB insert\n  const status = firstNonEmpty(j.status, j.state) ?? null;\n  const error = firstNonEmpty(j.error, j.err, j.message) ?? null;\n\n  return {\n    json: {\n      ...j,            // keep everything you already had\n      run_id,\n      doc_id,\n      filename,\n      file_type,\n      status,\n      error\n    },\n    binary: item.binary // preserve binary\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3328,
+        256
+      ],
+      "id": "514ef684-19fc-484a-9f36-a8ceb057f869",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "function firstNonEmpty(...vals) {\n  for (const v of vals) {\n    if (v === undefined || v === null) continue;\n    if (typeof v === 'string' && v.trim() === '') continue;\n    return v;\n  }\n  return null;\n}\n\nreturn items.map(item => {\n  const j = item.json ?? {};\n\n  const run_id = firstNonEmpty(\n    j.run_id,\n    j.runId,\n    j.execution_id,\n    $execution.id\n  );\n\n  const doc_id = firstNonEmpty(\n    j.doc_id,\n    j.docId,\n    j.file_id,\n    j.fileId,\n    j.id\n  );\n\n  const filename = firstNonEmpty(\n    j.file_name,\n    j.filename,\n    j.name,\n    j.fileName\n  );\n\n  const file_type = firstNonEmpty(\n    j.mimeType,\n    j.file_type,\n    j.fileType,\n    j.file_ext,\n    j.extension\n  );\n\n  // Optional: if you want stable keys for DB insert\n  const status = firstNonEmpty(j.status, j.state) ?? null;\n  const error = firstNonEmpty(j.error, j.err, j.message) ?? null;\n\n  return {\n    json: {\n      ...j,            // keep everything you already had\n      run_id,\n      doc_id,\n      filename,\n      file_type,\n      status,\n      error\n    },\n    binary: item.binary // preserve binary\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        -512
+      ],
+      "id": "9feacff3-804f-4831-9b6a-cee03f7ee76b",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Input is already structured JSON from previous node\nconst j = $json;\n\n// Metadata (already normalized earlier)\nconst meta = j._meta || {};\n\n// Extracted tender data (already JSON)\nconst extracted = j.extracted_json || null;\n\nreturn {\n  json: {\n    ...j,\n    run_id: meta.run_id ?? null,\n    doc_id: meta.doc_id ?? null,\n    file_id: meta.file_id ?? null,\n    file_name: meta.file_name ?? null,\n    file_type: meta.file_type ?? null,\n\n    extracted_json: extracted,\n    ok: true,\n    error: null\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -432,
+        -432
+      ],
+      "id": "13ddfa0b-2c0b-4615-b48b-be7c469675bc",
+      "name": "Code in JavaScript5"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const j = item.json ?? {};\n  return {\n    json: {\n      ...j,\n      _meta: {\n        run_id: j.run_id ?? null,\n        doc_id: j.doc_id ?? j.file_id ?? j.id ?? null,\n        file_id: j.file_id ?? j.id ?? null,\n        file_name: j.file_name ?? j.filename ?? j.name ?? null,\n        file_type: j.mimeType ?? j.file_type ?? null\n      }\n    },\n    binary: item.binary\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3248,
+        -32
+      ],
+      "id": "ff6fb2a7-27f6-48e3-bdec-8ea22fa893e4",
+      "name": "Code in JavaScript6"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "advanced": true,
+        "mergeByFields": {
+          "values": [
+            {
+              "field1": "filename",
+              "field2": "file_name"
+            }
+          ]
+        },
+        "joinMode": "keepEverything",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -2784,
+        -112
+      ],
+      "id": "7e7fbfd8-11b7-4199-94fb-cd02e1906610",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "jsCode": "function firstNonEmpty(...vals) {\n  return vals.find(v => v !== undefined && v !== null && v !== '') ?? null;\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const run_id = firstNonEmpty(\n    j.run_id,\n    j.runId\n  );\n\n  const doc_id = firstNonEmpty(\n    j.doc_id,\n    j.docId,\n    j.file_id,\n    j.fileId,\n    j.id\n  );\n\n  const file_name = firstNonEmpty(\n    j.file_name,\n    j.filename,\n    j.name\n  );\n\n  const file_type = firstNonEmpty(\n    j.file_type,\n    j.mimeType,\n    j.mime_type,\n    j.type\n  );\n\n  return {\n    json: {\n      ...j,               // keep everything\n      run_id,\n      doc_id,\n      file_name,\n      file_type\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2512,
+        -128
+      ],
+      "id": "a9cd90d7-8c2c-4ee4-a9b7-89e048c9f03d",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// LLM output is usually in $json (depends on node), but typically it's in $json.text or $json.output\n// Adjust if your LLM node returns it in a different field.\nconst llm = $json;\n\n// bring meta from previous node (the node BEFORE LLM)\nconst prev = $items(\"Code in JavaScript11\")[0].json; // <- change name to your actual previous node\nconst meta = prev._meta ?? {\n  run_id: prev.run_id ?? null,\n  doc_id: prev.doc_id ?? null,\n  file_id: prev.file_id ?? prev.id ?? null,\n  file_name: prev.file_name ?? prev.name ?? null,\n  file_type: prev.file_type ?? prev.mimeType ?? null,\n};\n\n// If your LLM returns JSON as string, parse it:\nlet extracted = llm;\nif (typeof llm === 'string') {\n  extracted = JSON.parse(llm);\n}\nif (typeof llm.text === 'string') {\n  extracted = JSON.parse(llm.text);\n}\n\nreturn {\n  json: {\n    _meta: meta,\n    extracted_json: extracted\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1344,
+        -480
+      ],
+      "id": "07a330fa-8667-42c5-8d03-b89151d09031",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst meta = j._meta || {\n  run_id: j.run_id ?? null,\n  doc_id: j.doc_id ?? j.file_id ?? j.id ?? null,\n  file_id: j.file_id ?? j.id ?? null,\n  file_name: j.file_name ?? j.filename ?? j.name ?? null,\n  file_type: j.file_type ?? j.mimeType ?? null,\n};\n\nreturn {\n  json: {\n    _meta: meta,\n    record_id: j.record_id,\n    status: j.status || 'processing',\n    _poll_count: 0\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3488,
+        -416
+      ],
+      "id": "f981ccf1-dd5a-4f31-95ec-9e7d8f525b0c",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "amount": 8
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -3216,
+        -448
+      ],
+      "id": "e98a8f75-a00f-4fc1-815c-bfcf26ae11f9",
+      "name": "Wait",
+      "webhookId": "b2e0d731-d8b8-4fd1-b8e4-113bc82b9daa"
+    },
+    {
+      "parameters": {
+        "url": "=https://extraction-api.nanonets.com/api/v1/extract/results/{{ $json.record_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer fa0f7036-f2ea-11f0-990c-52377b697aac"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -2960,
+        -496
+      ],
+      "id": "0bcd0361-185f-4f3d-80e1-4c0c347c66ea",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8e8b9169-bef7-49ff-84b3-10ffcdde22a5",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2720,
+        -464
+      ],
+      "id": "03fc29aa-ce60-45b8-95cc-4787ba0d667e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const meta = $json._meta || {};\nconst count = ($json._poll_count ?? 0) + 1;\n\nreturn {\n  json: {\n    ...$json,\n    _meta: meta,\n    _poll_count: count\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        -528
+      ],
+      "id": "1fd7777c-14f2-40c2-aa49-957183c34daa",
+      "name": "Code in JavaScript14"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7a3d62ea-5706-4779-99ed-5dd4a21a9358",
+              "leftValue": "={{ $json._poll_count }}",
+              "rightValue": 60,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2176,
+        -496
+      ],
+      "id": "95466b7e-021d-4001-a8d9-4905611d27cc",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return {\n  json: {\n    _meta: $json._meta,\n    record_id: $json.record_id,\n    status: 'TIMEOUT',\n    error: `Nanonets job not finished after ${$json._poll_count} polls`\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1952,
+        -544
+      ],
+      "id": "288d5fe1-2769-4283-9193-2d54fa074c56",
+      "name": "Code in JavaScript15"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pick run_id from the node where you created/attached it (change node name)\nconst runId =\n  $items(\"Attach run_id to files\")[0]?.json?.run_id\n  ?? $items(\"Code in JavaScript (run id)\")?.[0]?.json?.run_id\n  ?? $items(\"Start\")?.[0]?.json?.run_id\n  ?? null;\n\nreturn [{\n  json: {\n    ...$json,\n    run_id: runId\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4992,
+        448
+      ],
+      "id": "c2ea7182-6744-477b-9c85-eb454ef853b3",
+      "name": "Code in JavaScript16"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Du erzeugst UI-Daten für zwei Bereiche: SEARCH und OVERVIEW.\nAntworte ausschließlich mit gültigem JSON, keine Erklärungen.\nNICHT Raten: Wenn Information fehlt -> null oder [].\n\nINPUT facts_pack:\n{{ JSON.stringify($json.facts_pack) }}\n\nOUTPUT (genau dieses Schema):\n{\n  \"results\": [\n    {\n      \"tender_id\": \"string|null\",\n      \"title_de\": \"string|null\",\n      \"region_code\": \"string|null\",\n      \"tags_de\": [\"string\"],\n      \"client_de\": \"string|null\",\n      \"deadline_date\": \"YYYY-MM-DD|null\",\n      \"deadline_label_de\": \"string|null\",\n      \"scores\": {\n        \"must_percent\": 0,\n        \"must_fraction\": \"0/0\",\n        \"can_percent\": 0,\n        \"can_fraction\": \"0/0\",\n        \"total_percent\": 0,\n        \"total_label_de\": \"Insgesamt\"\n      },\n      \"right_side_risks_de\": [\"string\"],\n      \"actions\": { \"details_id\": \"string|null\" }\n    }\n  ],\n  \"overview\": {\n    \"tender_id\": \"string|null\",\n    \"submission_deadline\": { \"date\": \"YYYY-MM-DD|null\", \"label_de\": \"string|null\", \"days_remaining\": null },\n    \"executive_summary_de\": {\n      \"brief_description_de\": \"string|null\",\n      \"go_nogo_de\": [],\n      \"supply_capability_de\": [],\n      \"economic_efficiency_de\": [],\n      \"award_logic_de\": []\n    },\n    \"top5_mandatory_requirements_de\": [],\n    \"main_risks_de\": [],\n    \"missing_evidence_de\": [],\n    \"economic_analysis_de\": {\n      \"potential_margin\": { \"min_percent\": null, \"max_percent\": null, \"note_de\": null },\n      \"order_value_estimated\": { \"min_eur\": null, \"max_eur\": null, \"note_de\": null },\n      \"signals\": {\n        \"competitive_intensity_de\": \"Unbekannt\",\n        \"logistics_costs_de\": \"Unbekannt\",\n        \"contract_risk_de\": \"Unbekannt\"\n      }\n    }\n  }\n}\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a tender analyst.  You will receive extracted JSON from multiple documents belonging to the SAME run_id.  Your job: - Create ONE consolidated tender summary for the frontend. - Use ONLY docs[].extracted_json from the input (ignore raw text, ignore other fields). - If a field is missing, use null or []. - Deduplicate array values (certifications, requirements, penalties). - Be consistent: if multiple docs disagree, prefer the value that appears most often; if tie, pick the most complete/longest. - per_file should be one entry per doc, using values only from that doc’s extracted_json. - failed_files should include docs where extracted_json is null/empty OR doc status is FAILED/ERROR.  Output rules: - Return ONLY valid JSON. - No markdown, no explanation, no extra text."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -4096,
+        656
+      ],
+      "id": "498b5dc2-21d7-4ded-867f-534e0c4cf460",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5.1",
+          "mode": "list",
+          "cachedResultName": "gpt-5.1"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -4096,
+        912
+      ],
+      "id": "71b6d557-8070-4920-9c32-c102fe82c8bc",
+      "name": "OpenAI Chat Model5",
+      "credentials": {
+        "openAiApi": {
+          "id": "V0ACGBCG3JqeU5TI",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst run_id = j._meta?.run_id ?? j.run_id ?? null;\nconst doc_id =\n  j._meta?.doc_id ?? j.doc_id ?? j.file_id ?? j.id ?? j.document_id ?? null;\n\nconst filename =\n  j._meta?.file_name ??\n  j._meta?.filename ??\n  j.file_name ??\n  j.filename ??\n  j.name ??\n  null;\n\nconst fullText = j?.doc?.text ?? \"\";\nconst maxChars = 4000;\nconst overlap = 500;\nconst hardMaxChunks = 30;\n\nfunction chunkText(text, size, overlapSize) {\n  if (!text || typeof text !== \"string\") return [];\n  const chunks = [];\n  let i = 0;\n\n  while (i < text.length && chunks.length < hardMaxChunks) {\n    const end = Math.min(i + size, text.length);\n    chunks.push(text.slice(i, end));\n    if (end === text.length) break;\n    i = Math.max(0, end - overlapSize);\n  }\n  return chunks;\n}\n\nconst chunks = chunkText(fullText, maxChars, overlap);\n\n// ✅ ALWAYS return an array of items\nif (chunks.length === 0) {\n  return [\n    {\n      json: {\n        _meta: { run_id, doc_id, filename, chunk_index: 0, chunk_total: 0 },\n        chunk_text: \"\",\n      },\n    },\n  ];\n}\n\nreturn chunks.map((chunk, idx) => ({\n  json: {\n    _meta: {\n      run_id,\n      doc_id,\n      filename,\n      chunk_index: idx,\n      chunk_total: chunks.length,\n    },\n    chunk_text: chunk,\n  },\n}));\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2032,
+        -128
+      ],
+      "id": "f11536de-cac4-434e-8261-bcbbdcb8a21c",
+      "name": "Code in JavaScript19"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -1760,
+        -128
+      ],
+      "id": "bfbf5562-89d9-4f9d-af9a-94ee233c76eb",
+      "name": "Loop Over Items1",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nconst meta = j._meta ?? {};\n\n// ✅ LLM raw text is here in your data\nconst raw =\n  j?.extracted_json?.text ??      // <-- your current structure (from screenshot)\n  j?.extracted_json_text ??       // fallback\n  j?.text ??                      // some LLM nodes output here\n  j?.data?.text ??                // fallback\n  \"\";\n\nfunction safeParse(s) {\n  if (!s) return null;\n\n  // If model returns extra text, pull out the first JSON object\n  const t = String(s).trim();\n  const start = t.indexOf(\"{\");\n  const end = t.lastIndexOf(\"}\");\n  if (start === -1 || end === -1 || end <= start) return null;\n\n  const sliced = t.slice(start, end + 1);\n  return JSON.parse(sliced);\n}\n\nlet parsed = null;\nlet error = null;\n\ntry {\n  parsed = safeParse(raw);\n  if (!parsed) error = \"No JSON object found in LLM output\";\n} catch (e) {\n  error = e.message;\n}\n\nreturn [{\n  json: {\n    _meta: meta,\n    ok: !!parsed,\n    error,\n    extracted_json: parsed, // ✅ final parsed JSON object\n    raw_text: raw           // ✅ keep raw for debugging\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        -64
+      ],
+      "id": "c1430b60-e7a1-4ba9-b918-22d896aaf0b9",
+      "name": "Code in JavaScript20"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Run Once for ALL Items\n\n// Collect all rows\nconst rows = items.map(i => i.json);\n\n// ---- META (safe) ----\nconst meta =\n  rows.find(r => r._meta && Object.keys(r._meta).length)?._meta ??\n  rows[0]?._meta ??\n  {};\n\n// ---- Split good / bad ----\nconst good = rows.filter(r => r.ok && r.extracted_json);\nconst bad  = rows.filter(r => !r.ok);\n\n// ---- helpers ----\nfunction isNonEmptyString(v) {\n  return typeof v === \"string\" && v.trim() !== \"\";\n}\n\nfunction pickFirstNonNull(values) {\n  for (const v of values) {\n    if (v === undefined || v === null) continue;\n    if (isNonEmptyString(v)) return v.trim();\n    if (typeof v !== \"string\") return v;\n  }\n  return null;\n}\n\nfunction uniqStrings(arr) {\n  return Array.from(\n    new Set((arr || []).filter(isNonEmptyString).map(s => s.trim()))\n  );\n}\n\nfunction uniqEvidence(arr) {\n  const out = [];\n  const seen = new Set();\n  for (const e of (arr || [])) {\n    if (!e || typeof e !== \"object\") continue;\n    const key =\n      (e.doc_id ?? \"\") + \"|\" + (e.filename ?? \"\") + \"|\" + (e.page ?? \"\");\n    if (seen.has(key)) continue;\n    seen.add(key);\n    out.push(e);\n  }\n  return out;\n}\n\nfunction mergeObjects(objs) {\n  const out = {};\n  for (const o of objs) {\n    if (!o || typeof o !== \"object\") continue;\n    for (const [k, v] of Object.entries(o)) {\n      if (v === null || v === undefined) continue;\n\n      if (Array.isArray(v)) {\n        out[k] = (out[k] ?? []).concat(v);\n      } else if (typeof v === \"object\") {\n        out[k] = mergeObjects([out[k], v]);\n      } else {\n        out[k] = out[k] ?? v;\n      }\n    }\n  }\n  return out;\n}\n\n// ---- Extract all JSONs ----\nconst all = good.map(g => g.extracted_json);\n\n// ---- Collect arrays ----\nconst certifications = uniqStrings(all.flatMap(x => x?.certifications ?? []));\nconst mandatory      = uniqStrings(all.flatMap(x => x?.mandatory_requirements ?? []));\nconst operational    = uniqStrings(all.flatMap(x => x?.operational_requirements ?? []));\nconst risks          = uniqStrings(all.flatMap(x => x?.risks ?? []));\n\nconst evidence = uniqEvidence(\n  all.flatMap(x =>\n    Array.isArray(x?.evidence) ? x.evidence :\n    x?.evidence ? [x.evidence] : []\n  )\n);\n\n// ---- Merge nested ----\nconst commercials = mergeObjects(all.map(x => x?.commercials ?? {}));\nconst award_logic = mergeObjects(all.map(x => x?.award_logic ?? {}));\n\nif (Array.isArray(award_logic.evidence)) {\n  award_logic.evidence = uniqEvidence(award_logic.evidence);\n}\n\n// ---- Final merged object ----\nconst merged = {\n  tender_id: pickFirstNonNull(all.map(x => x?.tender_id)),\n  project_name: pickFirstNonNull(all.map(x => x?.project_name)),\n  issuing_authority: pickFirstNonNull(all.map(x => x?.issuing_authority)),\n  region_or_location: pickFirstNonNull(all.map(x => x?.region_or_location)),\n  submission_deadline: pickFirstNonNull(all.map(x => x?.submission_deadline)),\n  scope: pickFirstNonNull(all.map(x => x?.scope)),\n\n  certifications,\n  mandatory_requirements: mandatory,\n  operational_requirements: operational,\n\n  commercials,\n  award_logic,\n  risks,\n  evidence,\n};\n\nconst status = good.length > 0 ? \"SUCCESS\" : \"FAILED\";\nconst reason = status === \"FAILED\" ? bad[0]?.error ?? \"No valid chunks\" : null;\n\n// ---- RETURN (must be array) ----\nreturn [\n  {\n    json: {\n      run_id: meta.run_id ?? null,\n      doc_id: meta.doc_id ?? null,\n      filename: meta.filename ?? null,\n      status,\n      extracted_json: merged,\n      error: reason,\n      chunk_stats: {\n        total_chunks: meta.chunk_total ?? rows.length,\n        ok_chunks: good.length,\n        failed_chunks: bad.length,\n      },\n    },\n  },\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        -448
+      ],
+      "id": "187695d2-b5db-4b6d-ac30-6500c792f786",
+      "name": "Code in JavaScript21"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\n\nfunction safeParse(x){\n  if (!x) return null;\n  if (typeof x === \"object\") return x;\n  try { return JSON.parse(x); } catch { return null; }\n}\n\n// parse LLM output\nconst out =\n  safeParse(j.text) ??\n  safeParse(j.output) ??\n  safeParse(j.response) ??\n  null;\n\n// 🔒 explicitly preserve run_id (very important)\nconst run_id =\n  j.run_id ??\n  j.facts_pack?.run_id ??\n  j.final_ui_json?.meta?.run_id ??\n  j.meta?.run_id ??\n  null;\n\nreturn [{\n  json: {\n    ...j,\n\n    // always keep run_id at top-level\n    run_id: $('Aggregate Facts Pack').first().json.run_id,\n\n    // parsed UI JSON\n    ui_json: out,\n\n    ok: !!out,\n    error: out ? null : \"LLM output not valid JSON\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3728,
+        640
+      ],
+      "id": "d25d3a60-5626-44c4-9772-51343aa736fc",
+      "name": "Code in JavaScript17"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO public.run_summaries (\n  run_id,\n  summary_json,\n  ui_json,\n  total_files,\n  success_files,\n  failed_files,\n  status\n)\nVALUES (\n  '{{ $json.run_id }}',\n  '{{ JSON.stringify($json.ui_json).replace(/'/g, \"''\") }}'::jsonb,\n  '{{ JSON.stringify($json.ui_json).replace(/'/g, \"''\") }}'::jsonb,\n  {{ $json.total_files ?? 0 }},\n  {{ $json.success_files ?? 0 }},\n  {{ $json.failed_files ?? 0 }},\n  '{{ $json.status ?? \"COMPLETED\" }}'\n)\nON CONFLICT (run_id)\nDO UPDATE SET\n  summary_json = EXCLUDED.summary_json,\n  ui_json = EXCLUDED.ui_json,\n  total_files = EXCLUDED.total_files,\n  success_files = EXCLUDED.success_files,\n  failed_files = EXCLUDED.failed_files,\n  status = EXCLUDED.status,\n  updated_at = NOW();\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -3232,
+        720
+      ],
+      "id": "11d15ef7-20e4-4193-8a37-099b5537c1f5",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "jwwhJVc5vm3KZbqZ",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\n\n// Try multiple possible locations for ids/names (because your workflow has different branches)\nconst doc_id =\n  j.doc_id ??\n  j.file_id ??\n  j._meta?.doc_id ??\n  j._meta?.file_id ??\n  null;\n\nconst filename =\n  j.filename ??\n  j.file_name ??\n  j._meta?.file_name ??\n  j._meta?.filename ??\n  null;\n\nconst chunk_text =\n  j.chunk_text ??\n  j.text ??\n  j.doc?.text ??\n  null;\n\nconst chunk_index = j.chunk_index ?? 0;\nconst chunk_total = j.chunk_total ?? 1;\n\n// If tender_id is already extracted earlier, pass it too\nconst tender_id =\n  j.extracted_json?.tender_id ??\n  j.evidence?.tender_id ??\n  null;\n\n// page info is often missing for docx; keep null honestly\nconst page_number = j.page_number ?? null;\nconst total_pages = j.total_pages ?? j.totalPages ?? null;\n\nreturn {\n  json: {\n    doc_id,\n    filename,\n    tender_id,\n    chunk_index,\n    chunk_total,\n    page_number,\n    total_pages,\n    chunk_text\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1456,
+        -112
+      ],
+      "id": "c8c777a9-60c0-481a-abe0-f86ff932a9ed",
+      "name": "prepare LLM Note"
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $json;\n\n// 1) Get raw model output (often in input.text)\nlet raw = input.text ?? input.output ?? input.response ?? input.result ?? input;\n\n// 2) If it’s a string, parse JSON\nlet out = raw;\nif (typeof raw === \"string\") {\n  try {\n    out = JSON.parse(raw);\n  } catch (e) {\n    // If model returned non-JSON, keep it honest\n    out = {};\n  }\n}\n\n// helpers\nconst arr = (x) => Array.isArray(x) ? x : [];\nconst strOrNull = (x) => (typeof x === \"string\" && x.trim()) ? x.trim() : null;\nconst num = (x) => Number.isFinite(+x) ? +x : 0;\n\nconst normalized = {\n  doc_meta: {\n    tender_id: strOrNull(out?.doc_meta?.tender_id) ?? strOrNull(input?.tender_id) ?? null,\n    doc_type: out?.doc_meta?.doc_type ?? \"unknown\",\n    doc_relevance: Math.max(0, Math.min(100, num(out?.doc_meta?.doc_relevance))),\n    language: \"de\",\n  },\n\n  // accept both keys from LLM\n  extraction_warnings_de: arr(out?.extraction_warnings_de).length\n    ? arr(out?.extraction_warnings_de)\n    : arr(out?.extraction_warning_de),\n\n  mandatory_requirements: arr(out?.mandatory_requirements),\n  operational_requirements: arr(out?.operational_requirements),\n\n  commercials: {\n    penalties: arr(out?.commercials?.penalties),\n  },\n\n  award_logic: {\n    matrix_de: strOrNull(out?.award_logic?.matrix_de),\n    price_weight_percent: Math.max(0, Math.min(100, num(out?.award_logic?.price_weight_percent))),\n    quality_weight_percent: Math.max(0, Math.min(100, num(out?.award_logic?.quality_weight_percent))),\n    other_de: strOrNull(out?.award_logic?.other_de),\n    evidence: arr(out?.award_logic?.evidence),\n  },\n\n  risks: arr(out?.risks),\n};\n\nreturn [{\n  json: {\n    ...input,\n    extracted_json: normalized,\n    ok: Object.keys(out || {}).length > 0,\n    error: Object.keys(out || {}).length > 0 ? null : \"LLM returned non-JSON or could not be parsed\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -816,
+        -112
+      ],
+      "id": "02b41a8a-4c83-4dc2-b82c-e310ded59c5a",
+      "name": "prep JSOn"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rows = $input.all().map(i => i.json);\n\nfunction safeParse(x){\n  if (!x) return null;\n  if (typeof x === \"object\") return x;\n  try { return JSON.parse(x); } catch { return null; }\n}\nfunction arr(x){ return Array.isArray(x) ? x : []; }\nfunction str(x){ return (typeof x === \"string\" && x.trim()) ? x.trim() : null; }\n\n// ✅ if requirements/penalties/risks are strings, keep them\n// ✅ if objects, extract text_de/text\nfunction toText(x){\n  if (typeof x === \"string\") return x.trim();\n  if (x && typeof x === \"object\") return (x.text_de ?? x.text ?? \"\").trim();\n  return \"\";\n}\n\nfunction dedupeByTextFlexible(list){\n  const seen = new Set();\n  const out = [];\n  for (const x of (list || [])) {\n    const key = toText(x);\n    if (!key) continue;\n    if (seen.has(key)) continue;\n    seen.add(key);\n\n    // keep original type (string or object)\n    out.push(x);\n  }\n  return out;\n}\n\nconst run_id =\n  rows[0]?.run_id ??\n  rows[0]?._meta?.run_id ??\n  null;\n\nconst docs = [];\nconst doc_types = {};\nlet tender_id = null;\n\nlet mandatory = [];\nlet operational = [];\nlet penalties = [];\nlet risks = [];\nlet warnings = [];\nlet award_bits = [];\n\nfor (const r of rows) {\n  const ex = safeParse(r.extracted_json);\n  if (!ex) continue;\n\nconst dt =\n  ex?.doc_meta?.doc_type ??\n  r._meta?.doc_type_final ??\n  r.doc_type_final ??\n  \"unknown\";\n\n  doc_types[dt] = (doc_types[dt] ?? 0) + 1;\n\n  docs.push({\n    doc_id: r.doc_id ?? null,\n    filename: r.file_name ?? r.filename ?? null,\n    doc_type: dt,\n    doc_relevance: ex?.doc_meta?.doc_relevance ?? 0\n  });\n\n  tender_id = tender_id ?? str(ex?.doc_meta?.tender_id);\n\n  // ✅ these are mostly strings in your pipeline\n  mandatory.push(...arr(ex?.mandatory_requirements));\n  operational.push(...arr(ex?.operational_requirements));\n  penalties.push(...arr(ex?.commercials?.penalties));\n  risks.push(...arr(ex?.risks));\n  warnings.push(...arr(ex?.extraction_warnings_de));\n\n  if (ex?.award_logic) award_bits.push(ex.award_logic);\n}\n\n// ✅ flexible dedupe: works for strings and objects\nmandatory = dedupeByTextFlexible(mandatory);\noperational = dedupeByTextFlexible(operational);\npenalties = dedupeByTextFlexible(penalties);\nrisks = dedupeByTextFlexible(risks);\n\n// deterministic “missing evidence” (honest)\nconst requiredDocTypes = [\n  { type: \"tender_notice\", label: \"Bekanntmachung / Ausschreibung\" },\n  { type: \"specification\", label: \"Leistungsbeschreibung / Anforderungen\" },\n  { type: \"terms_contract\", label: \"Vertragsbedingungen (z.B. VOB/AGB)\" }\n];\n\nconst missing_evidence_de = requiredDocTypes.map(r => ({\n  text_de: r.label,\n  status: doc_types[r.type] ? \"ok\" : \"missing\"\n}));\n\nreturn [{\n  json: {\n    run_id: run_id ? String(run_id) : null,\n    tender_id: tender_id ?? null,\n    facts_pack: {\n      run_id: run_id ? String(run_id) : null,\n      tender_id: tender_id ?? null,\n      docs,\n      doc_types,\n      mandatory_requirements: mandatory,\n      operational_requirements: operational,\n      commercials: { penalties },\n      risks,\n      award_logic_bits: award_bits,\n      extraction_warnings_de: warnings,\n      missing_evidence_de\n    }\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4432,
+        672
+      ],
+      "id": "e8ddf078-dd75-41d6-a62a-488b87d6b629",
+      "name": "Aggregate Facts Pack"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\nconst ui = j.ui_json ?? {};\n\nfunction daysRemaining(dateStr) {\n  if (!dateStr) return null;\n  const d = new Date(dateStr + \"T00:00:00Z\");\n  if (isNaN(d.getTime())) return null;\n  const now = new Date();\n  return Math.ceil((d.getTime() - now.getTime()) / (1000*60*60*24));\n}\n\nif (ui?.overview?.submission_deadline?.date) {\n  ui.overview.submission_deadline.days_remaining =\n    daysRemaining(ui.overview.submission_deadline.date);\n}\n\n// clamp\nif (Array.isArray(ui?.results)) ui.results = ui.results.slice(0, 50);\nif (ui?.results?.[0]?.right_side_risks_de) {\n  ui.results[0].right_side_risks_de = ui.results[0].right_side_risks_de.slice(0, 5);\n}\nif (ui?.overview?.top5_mandatory_requirements_de) {\n  ui.overview.top5_mandatory_requirements_de = ui.overview.top5_mandatory_requirements_de.slice(0, 5);\n}\n\n// ensure ids\nconst run_id = j.run_id ?? j.facts_pack?.run_id ?? null;\nif (ui?.results?.[0]) {\n  ui.results[0].actions = ui.results[0].actions ?? {};\n  ui.results[0].actions.details_id = ui.results[0].actions.details_id ?? j.tender_id ?? null;\n}\nif (ui?.overview) {\n  ui.overview.tender_id = ui.overview.tender_id ?? j.tender_id ?? null;\n}\n\nreturn [{\n  json: {\n    run_id: run_id ? String(run_id) : null,\n    tender_id: j.tender_id ?? null,\n    ui_json: ui,\n    stats: j.stats ?? { total_files: 0, success_files: 0, failed_files: 0 },\n    status: \"COMPLETED\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3456,
+        656
+      ],
+      "id": "f9347423-8dba-4032-953c-ff4f725d4a6d",
+      "name": "final ui json"
+    },
+    {
+      "parameters": {
+        "jsCode": "const j = $json;\nconst bin = $binary; // <- current item's binary (if any)\n\nconst filename = (j.file_name ?? j.filename ?? j.name ?? \"\").toLowerCase();\nconst text = ((j.preview_text ?? j.fullText ?? j.text ?? \"\") + \"\")\n  .toLowerCase()\n  .slice(0, 5000);\n\nfunction hasAny(hay, needles){ return needles.some(n => hay.includes(n)); }\nfunction choose(best, type, score, reason){\n  if (score > best.score) return { type, score, reason };\n  return best;\n}\n\nlet best = { type: \"unknown\", score: 0.0, reason: \"no match\" };\n\n// --- your rules (example) ---\nif (hasAny(filename, [\"vob\", \"agb\", \"vertragsbedingungen\", \"teilnahmebedingungen\", \"vertrag\", \"vhb_212\", \"vhb_213\"])) {\n  best = choose(best, \"terms_contract\", 0.90, \"filename indicates contract terms\");\n}\nif (hasAny(filename, [\"datenschutz\", \"dsgvo\", \"privacy\", \"fb 261\"])) {\n  best = choose(best, \"forms_privacy\", 0.92, \"filename indicates privacy\");\n}\n// ... add the rest of your rules\n\nj._meta = j._meta ?? {};\nj._meta.doc_type_det = best.type;\nj._meta.doc_type_det_conf = best.score;\nj._meta.doc_type_det_reason = best.reason;\n\n// ✅ IMPORTANT: return binary along with json\nreturn [{\n  json: j,\n  binary: bin\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4320,
+        -192
+      ],
+      "id": "56c8b0a9-9d3f-42d4-bad2-dab76657f74d",
+      "name": "doc type"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "File Descriptor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Descriptor": {
+      "main": [
+        [
+          {
+            "node": "Normalize meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "File Type Router": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GAEB_to_Excel_AvaCloud",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM: extract facts (chunk)": {
+      "main": [
+        [
+          {
+            "node": "CH05_parse_llm_text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "LLM: extract facts (chunk)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CH05_parse_llm_text": {
+      "main": [
+        [
+          {
+            "node": "CH08_prepare_summary_input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CH08_prepare_summary_input": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GAEB_to_Excel_AvaCloud": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript11": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript19",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain3",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain3": {
+      "main": [
+        [
+          {
+            "node": "prep JSOn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript12": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript13",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript13": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders1": {
+      "main": [
+        [
+          {
+            "node": "Attach run_id to files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript16",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attach run_id to files": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize meta": {
+      "main": [
+        [
+          {
+            "node": "doc type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript5": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript6": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript14",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript14": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript15",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript16": {
+      "main": [
+        [
+          {
+            "node": "Select rows from a table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select rows from a table": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Facts Pack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript19": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript21",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "prepare LLM Note",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript20": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript21": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript17": {
+      "main": [
+        [
+          {
+            "node": "final ui json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prepare LLM Note": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "prep JSOn": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript20",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Facts Pack": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "final ui json": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "doc type": {
+      "main": [
+        [
+          {
+            "node": "File Type Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "78a74c32-ad78-499d-bc62-e6ca6cac2238",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9e7b76a41d36a8b337cd7c9b1402fe24cacc0cfa487495a1228172ba7efaecf1"
+  },
+  "id": "P7ga7PGOv7eSt4HbKd6M9",
+  "tags": []
+}
