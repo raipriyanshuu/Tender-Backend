@@ -59,7 +59,7 @@ app.use((req, res, next) => {
 
 
 // Routes
-app.use(uploadRouter); 
+app.use(uploadRoutes);
 app.use('/api/tenders', tendersRouter);
 
 // Root endpoint
