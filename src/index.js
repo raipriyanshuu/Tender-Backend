@@ -34,14 +34,17 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/ping', (req, res) => {
-  res.send('pong');
-});
+
 
 
 // Routes
 app.use(uploadRoutes);
 app.use('/api/tenders', tendersRouter);
+
+
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
 // Root endpoint
 app.get('/', (req, res) => {
