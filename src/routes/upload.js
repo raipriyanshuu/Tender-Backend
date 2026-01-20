@@ -14,7 +14,10 @@ router.post("/upload-tender", upload.single("file"), async (req, res) => {
     }
 
     const form = new FormData();
-    form.append("file", req.file.buffer, req.file.originalname);
+    form.append("file", req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
+    });
 
     await axios.post(
       "https://pipemachine.app.n8n.cloud/webhook/tender-upload",
