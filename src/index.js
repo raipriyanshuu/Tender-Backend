@@ -12,16 +12,26 @@ const PORT = process.env.PORT || 3001;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
 // Middleware - Allow multiple origins for development
-app.use(cors({
-  origin: [
+const allowedOrigins = new Set([
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://tenderautomation1.vercel.app',
+  'http://127.0.0.1:5500',
+  'http://localhost:5500',
+]);
 
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://tenderautomation1.vercel.app'
-  ],
+app.use(cors({
+  origin: (origin, cb) => {
+    // allow server-to-server / curl / postman (no Origin header)
+    if (!origin) return cb(null, true);
+
+    if (allowedOrigins.has(origin)) return cb(null, true);
+
+    return cb(new Error(`CORS blocked for origin: ${origin}`), false);
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
 }));
 
 app.options('*', cors());
