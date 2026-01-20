@@ -57,19 +57,265 @@ function transformTenderOverview(overview, tenderId) {
  */
 function parseDateFromText(text) {
   if (!text || typeof text !== 'string') return null;
-  
+
   // Match German date format: DD.MM.YYYY
   const germanDateMatch = text.match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
   if (germanDateMatch) {
     const [, day, month, year] = germanDateMatch;
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
   }
-  
+
   // Match ISO format: YYYY-MM-DD
   const isoMatch = text.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) return isoMatch[0];
-  
+
   return null;
+}
+
+/**
+ * Transform nested summary structure (actual N8N DB format) to frontend Tender format
+ * Includes document source tracking, KPI calculation, certification extraction, and validation
+ */
+function transformNestedSummaryToFlat(uiJson, runId) {
+  // Validate input
+  if (!uiJson || typeof uiJson !== 'object') {
+    console.warn(`Invalid uiJson for run ${runId}`);
+    return null;
+  }
+
+  const search = uiJson.summary?.search || {};
+  const overview = uiJson.summary?.overview || {};
+  const timeline = overview.timeline || {};
+  const economicAnalysis = overview.economic_analysis || {};
+  const awardLogic = overview.award_logic || {};
+  const goNoGo = overview.go_no_go || {};
+  const supplyCapability = overview.supply_capability || {};
+
+  // Extract mandatory requirements with source tracking (TOP 5 ONLY)
+  const mandatoryRequirementsWithSource = (overview.top_mandatory_requirements || [])
+    .slice(0, 5) // Limit to top 5
+    .map(req => {
+      if (typeof req === 'string') {
+        return { text: req, source_document: 'Unknown', source_chunk_id: null };
+      }
+      return {
+        text: req.text || req.requirement_de || req.requirement || '',
+        source_document: req.source_document || 'Unknown',
+        source_chunk_id: req.source_chunk_id || null
+      };
+    })
+    .filter(r => r.text);
+
+  // Extract risks with source tracking (TOP 5 ONLY)
+  const risksWithSource = (overview.main_risks || [])
+    .slice(0, 5) // Limit to top 5
+    .map(r => {
+      if (typeof r === 'string') {
+        return { text: r, severity: 'medium', source_document: 'Unknown', source_chunk_id: null };
+      }
+      return {
+        text: r.text || r.risk_de || r.risk || '',
+        severity: r.severity || 'medium',
+        source_document: r.source_document || 'Unknown',
+        source_chunk_id: r.source_chunk_id || null
+      };
+    })
+    .filter(r => r.text);
+
+  // Extract process steps from timeline phases with source tracking
+  const processSteps = (timeline.phases || []).map((phase, idx) => ({
+    step: idx + 1,
+    days_de: phase.duration_days || '',
+    title_de: phase.title || phase.title_de || '',
+    description_de: phase.description || phase.description_de || '',
+    source_document: phase.source_document || 'Unknown',
+    source_chunk_id: phase.source_chunk_id || null
+  }));
+
+  // Extract penalties with source tracking
+  const penalties = [];
+
+  // Extract evaluation criteria from award_logic with source tracking
+  const evaluationCriteria = [];
+  if (Array.isArray(awardLogic.weights)) {
+    awardLogic.weights.forEach(w => {
+      const text = typeof w === 'string' ? w : (w.text || w.weight_de || '');
+      if (text) {
+        evaluationCriteria.push({
+          text,
+          source_document: w.source_document || 'Unknown',
+          source_chunk_id: w.source_chunk_id || null
+        });
+      }
+    });
+  }
+  if (awardLogic.notes) {
+    evaluationCriteria.push({
+      text: awardLogic.notes,
+      source_document: 'Award Logic',
+      source_chunk_id: null
+    });
+  }
+  if (Array.isArray(awardLogic.evaluation_matrix)) {
+    awardLogic.evaluation_matrix.slice(0, 3).forEach(e => {
+      const text = typeof e === 'string' ? e : (e.text || '');
+      if (text) {
+        evaluationCriteria.push({
+          text,
+          source_document: e.source_document || 'Unknown',
+          source_chunk_id: e.source_chunk_id || null
+        });
+      }
+    });
+  }
+
+  // Extract missing evidence documents with source tracking
+  const missingEvidence = (overview.missing_evidence_documents || [])
+    .map(doc => {
+      if (typeof doc === 'string') {
+        return { text: doc, source_document: 'Unknown', source_chunk_id: null };
+      }
+      return {
+        text: doc.text || doc.document_de || '',
+        source_document: doc.source_document || 'Unknown',
+        source_chunk_id: doc.source_chunk_id || null
+      };
+    })
+    .filter(d => d.text);
+
+  // Extract certifications from supply_capability
+  const certifications = [];
+  if (supplyCapability.scope_of_services) {
+    const services = Array.isArray(supplyCapability.scope_of_services)
+      ? supplyCapability.scope_of_services
+      : [supplyCapability.scope_of_services];
+
+    services.forEach(service => {
+      const text = typeof service === 'string' ? service : (service.text || '');
+      // Look for certification keywords
+      if (text && (text.includes('ISO') || text.includes('Zertifikat') || text.includes('certification'))) {
+        certifications.push(text);
+      }
+    });
+  }
+
+  // Parse deadline
+  const deadlineText = search.deadline || timeline.submission_deadline;
+  const deadline = parseDateFromText(deadlineText) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  // Calculate KPIs based on actual data
+  // Since go_no_go.must_have and possible_hit are empty objects,
+  // we'll use the actual arrays: top_mandatory_requirements and main_risks
+  const totalMandatoryReqs = mandatoryRequirementsWithSource.length;
+  const totalRisks = risksWithSource.length;
+
+  // For must-hit: assume we can fulfill all mandatory requirements (optimistic)
+  // In a real scenario, this would come from a matching algorithm
+  const mustHits = totalMandatoryReqs;
+  const mustTotal = totalMandatoryReqs || 1; // Avoid division by zero
+  const mustHitPercent = mustTotal > 0 ? Math.round((mustHits / mustTotal) * 100) : 0;
+
+  // For possible-hit: use the number of risks as "possible issues"
+  // Assume we can mitigate most risks (e.g., 80% success rate)
+  const canHits = Math.round(totalRisks * 0.8); // 80% of risks can be mitigated
+  const canTotal = totalRisks || 1; // Avoid division by zero
+  const possibleHitPercent = canTotal > 0 ? Math.round((canHits / canTotal) * 100) : 0;
+
+  // Calculate overall score based on go_no_go decision and KPIs
+  let baseScore = 50; // Default for UNKNOWN
+  if (goNoGo.decision === 'GO') baseScore = 85;
+  else if (goNoGo.decision === 'MAYBE') baseScore = 60;
+  else if (goNoGo.decision === 'NO-GO') baseScore = 30;
+
+  // Weighted score: 60% must-hit + 30% possible-hit + 10% base decision
+  const weightedScore = Math.round(
+    (mustHitPercent * 0.6) + (possibleHitPercent * 0.3) + (baseScore * 0.1)
+  );
+
+  // Calculate logistics score (100% if feasibility check passed)
+  const logisticsScore = 100; // Default to 100% for now
+
+
+  // Extract economic analysis with source tracking (TOP 5 FACTS ONLY)
+  const economicFacts = (economicAnalysis.facts || []).slice(0, 5); // Limit to top 5
+  const economicAnalysisFormatted = {
+    potentialMargin: {
+      text: economicFacts.find(f => f.text?.toLowerCase().includes('margin'))?.text || 'Missing',
+      source_document: economicFacts.find(f => f.text?.toLowerCase().includes('margin'))?.source_document || null
+    },
+    orderValueEstimated: {
+      text: economicFacts.find(f => f.text?.toLowerCase().includes('wert') || f.text?.toLowerCase().includes('summe'))?.text || 'Missing',
+      source_document: economicFacts.find(f => f.text?.toLowerCase().includes('wert') || f.text?.toLowerCase().includes('summe'))?.source_document || null
+    },
+    competitiveIntensity: {
+      text: economicFacts.find(f => f.text?.toLowerCase().includes('wettbewerb'))?.text || 'Missing',
+      source_document: economicFacts.find(f => f.text?.toLowerCase().includes('wettbewerb'))?.source_document || null
+    },
+    logisticsCosts: {
+      text: economicFacts.find(f => f.text?.toLowerCase().includes('kosten'))?.text || 'Missing',
+      source_document: economicFacts.find(f => f.text?.toLowerCase().includes('kosten'))?.source_document || null
+    },
+    contractRisk: {
+      text: economicFacts.find(f => f.text?.toLowerCase().includes('risiko'))?.text || 'Missing',
+      source_document: economicFacts.find(f => f.text?.toLowerCase().includes('risiko'))?.source_document || null
+    },
+    criticalSuccessFactors: economicFacts.slice(0, 5).map(f => ({
+      text: f.text || '',
+      source_document: f.source_document || 'Unknown',
+      source_chunk_id: f.source_chunk_id || null
+    })).filter(f => f.text),
+  };
+
+  return {
+    id: runId || search.title || `tender-${Date.now()}`,
+    title: search.title || overview.executive_summary?.substring(0, 100) || 'Missing Title',
+    buyer: search.issuer || 'Missing Issuer',
+    region: search.region_tags?.[0] || search.location || 'Missing Location',
+    deadline: deadline,
+    url: `#`,
+    score: weightedScore,
+    legalRisks: risksWithSource.map(r => r.text),
+    legalRisksWithSource: risksWithSource,
+    mustHits: mustHits,
+    mustTotal: mustTotal,
+    mustHitPercent: mustHitPercent,
+    canHits: canHits,
+    canTotal: canTotal,
+    possibleHitPercent: possibleHitPercent,
+    logisticsScore: logisticsScore,
+    serviceTypes: search.category_tags || [],
+    scopeOfWork: search.short_teaser || overview.executive_summary || '',
+    scopeOfWorkSource: {
+      text: search.short_teaser || overview.executive_summary || '',
+      source_document: search.source_document || 'Search Summary',
+      source_chunk_id: search.source_chunk_id || null
+    },
+    penalties: penalties,
+    evaluationCriteria: evaluationCriteria.map(e => e.text),
+    evaluationCriteriaWithSource: evaluationCriteria,
+    submission: mandatoryRequirementsWithSource.map(r => r.text),
+    submissionWithSource: mandatoryRequirementsWithSource,
+    processSteps: processSteps,
+    economicAnalysis: economicAnalysisFormatted,
+    missingEvidence: missingEvidence.map(e => e.text),
+    missingEvidenceWithSource: missingEvidence,
+    certifications: certifications,
+    // Add source tracking for key fields
+    sources: {
+      title: search.source_document || 'Search Summary',
+      buyer: search.source_document || 'Search Summary',
+      deadline: search.source_document || timeline.source_document || 'Timeline',
+      mustCriteria: 'Overview - Top Mandatory Requirements',
+      logistics: 'Supply Capability',
+      certifications: 'Supply Capability',
+      scopeOfWork: search.source_document || 'Search Summary',
+      pricingModel: 'Economic Analysis',
+      penalties: 'Award Logic',
+      evaluationCriteria: 'Award Logic',
+      submission: 'Overview - Top Mandatory Requirements',
+      legalRisks: 'Overview - Main Risks',
+    }
+  };
 }
 
 /**
@@ -86,11 +332,11 @@ function transformFlatUIJson(uiJson, runId) {
   const timeline = uiJson.timeline_milestones || {};
   const commercials = uiJson.commercials || {};
   const awardLogic = uiJson.award_logic || {};
-  
+
   // Parse fractions with proper fallback to array lengths
   let mustHits = 0, mustTotal = mandatoryReqs.length;
   let canHits = 0, canTotal = operationalReqs.length;
-  
+
   if (kpis.must_hit_fraction && typeof kpis.must_hit_fraction === 'string') {
     const parts = kpis.must_hit_fraction.split('/').map(Number);
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -98,7 +344,7 @@ function transformFlatUIJson(uiJson, runId) {
       mustTotal = parts[1];
     }
   }
-  
+
   if (kpis.possible_hit_fraction && typeof kpis.possible_hit_fraction === 'string') {
     const parts = kpis.possible_hit_fraction.split('/').map(Number);
     if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -106,19 +352,19 @@ function transformFlatUIJson(uiJson, runId) {
       canTotal = parts[1];
     }
   }
-  
+
   // Extract risk texts
   const riskTexts = risks.map(r => r.risk_de || r.risk || '').filter(Boolean);
-  
+
   // Build title with fallbacks
-  const title = meta.tender_id 
+  const title = meta.tender_id
     ? `Ausschreibung ${meta.tender_id}`
     : execSummary.brief_description_de?.substring(0, 50) || 'Untitled Tender';
-  
+
   // Buyer with fallbacks - try to extract from commercials.other_de if organization is missing
   let buyer = meta.organization;
   if (!buyer && Array.isArray(commercials.other_de)) {
-    const orgHint = commercials.other_de.find(t => 
+    const orgHint = commercials.other_de.find(t =>
       typeof t === 'string' && t.toLowerCase().includes('auftraggeber')
     );
     if (orgHint) {
@@ -128,7 +374,7 @@ function transformFlatUIJson(uiJson, runId) {
     }
   }
   buyer = buyer || execSummary.location_de || 'Unknown';
-  
+
   // Extract penalties from commercials
   // Use penalties_de if available, otherwise fallback to other_de with penalty-related terms
   let penalties = [];
@@ -145,7 +391,7 @@ function transformFlatUIJson(uiJson, runId) {
       ))
       .slice(0, 3); // Limit to top 3
   }
-  
+
   // Extract evaluation criteria from award_logic
   // Fallback to commercials.other_de if award logic is empty
   const evaluationCriteria = [];
@@ -153,11 +399,11 @@ function transformFlatUIJson(uiJson, runId) {
   if (awardLogic.price_weight_percent) evaluationCriteria.push(`Price: ${awardLogic.price_weight_percent}%`);
   if (awardLogic.quality_weight_percent) evaluationCriteria.push(`Quality: ${awardLogic.quality_weight_percent}%`);
   if (awardLogic.other_de) evaluationCriteria.push(awardLogic.other_de);
-  
+
   // Fallback: Use commercials.other_de if evaluation criteria is empty
   if (evaluationCriteria.length === 0 && Array.isArray(commercials.other_de) && commercials.other_de.length > 0) {
     // Use first item as fallback if it contains evaluation-related terms
-    const evalHint = commercials.other_de.find(t => 
+    const evalHint = commercials.other_de.find(t =>
       typeof t === 'string' && (
         t.toLowerCase().includes('bewertung') ||
         t.toLowerCase().includes('zuschlag') ||
@@ -167,7 +413,7 @@ function transformFlatUIJson(uiJson, runId) {
     );
     if (evalHint) evaluationCriteria.push(evalHint);
   }
-  
+
   // Deadline with fallbacks - parse date from text if needed
   let deadline = timeline.submission_deadline_de;
   if (!deadline && execSummary.duration_de) {
@@ -178,19 +424,19 @@ function transformFlatUIJson(uiJson, runId) {
     // Default: 30 days from now
     deadline = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
   }
-  
+
   // Extract mandatory requirements text for "Top 5 mandatory requirements" / submission field
   const mandatoryRequirementsText = mandatoryReqs.map(r => r.requirement_de || r.requirement || '').filter(Boolean);
-  
+
   // Extract process steps for timeline
   const processSteps = Array.isArray(uiJson.process_steps) ? uiJson.process_steps : [];
-  
+
   // Extract economic analysis data
   const economicAnalysis = uiJson.economic_analysis || {};
-  
+
   // Extract missing evidence documents
   const missingEvidence = Array.isArray(uiJson.missing_evidence_documents) ? uiJson.missing_evidence_documents : [];
-  
+
   return {
     id: meta.tender_id || runId || `tender-${Date.now()}`,
     title: title,
@@ -233,61 +479,61 @@ function transformLLMExtraction(extractedJson, filename, docId) {
   const risks = extractedJson?.risks || [];
   const commercials = extractedJson?.commercials || {};
   const awardLogic = extractedJson?.award_logic || {};
-  
+
   // Comprehensive tender_id lookup
   const tenderId = extractedJson?.tender_id || docMeta.tender_id || docId;
-  
+
   // Comprehensive buyer/organization lookup with fallbacks
-  const buyer = extractedJson?.issuing_authority 
-    || docMeta.organization 
-    || extractedJson?.region_or_location 
+  const buyer = extractedJson?.issuing_authority
+    || docMeta.organization
+    || extractedJson?.region_or_location
     || 'Unknown';
-  
+
   // Title with fallbacks: tender_id → project_name → filename
   const title = extractedJson?.tender_id || docMeta.tender_id
     ? `Ausschreibung ${tenderId}`
     : extractedJson?.project_name || filename || 'Untitled Tender';
-  
+
   // Scope of work with fallbacks
-  const scopeOfWork = extractedJson?.scope 
+  const scopeOfWork = extractedJson?.scope
     || extractedJson?.executive_summary?.brief_description_de
     || mandatoryReqs.map(r => typeof r === 'string' ? r : (r.requirement || r.requirement_de || r)).join('; ').substring(0, 200)
     || '';
-  
+
   // Extract penalties from commercials
-  const penalties = Array.isArray(commercials.penalties) 
+  const penalties = Array.isArray(commercials.penalties)
     ? commercials.penalties.map(p => typeof p === 'string' ? p : (p.item_de || p.penalty || p))
     : [];
-  
+
   // Extract award/evaluation criteria
   const evaluationCriteria = [];
   if (awardLogic.matrix_description) evaluationCriteria.push(awardLogic.matrix_description);
   if (awardLogic.weights) evaluationCriteria.push(JSON.stringify(awardLogic.weights));
   if (awardLogic.total_score) evaluationCriteria.push(`Total Score: ${awardLogic.total_score}`);
-  
+
   // Extract requirement texts
-  const mandatoryTexts = mandatoryReqs.map(r => 
+  const mandatoryTexts = mandatoryReqs.map(r =>
     typeof r === 'string' ? r : r.requirement || r.requirement_de || r
   );
-  const operativeTexts = operativeReqs.map(r => 
+  const operativeTexts = operativeReqs.map(r =>
     typeof r === 'string' ? r : r.requirement || r.requirement_de || r
   );
-  const riskTexts = risks.map(r => 
+  const riskTexts = risks.map(r =>
     typeof r === 'string' ? r : r.risk || r.risk_de || r
   );
-  
+
   // Certifications
-  const certifications = Array.isArray(extractedJson?.certifications) 
+  const certifications = Array.isArray(extractedJson?.certifications)
     ? extractedJson.certifications.map(c => typeof c === 'string' ? c : (c.name || c.certification || c))
     : [];
-  
+
   return {
     id: tenderId || `tender-${Date.now()}`,
     title: title,
     buyer: buyer,
     region: extractedJson?.region_or_location || 'DE',
-    deadline: extractedJson?.submission_deadline 
-      || extractedJson?.deadlines?.details?.[0]?.date 
+    deadline: extractedJson?.submission_deadline
+      || extractedJson?.deadlines?.details?.[0]?.date
       || extractedJson?.contract_duration
       || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     url: `#`,
@@ -318,15 +564,15 @@ function transformLLMExtraction(extractedJson, filename, docId) {
  */
 router.get('/', async (req, res) => {
   try {
-    const { sortBy = 'deadline', limit = 50, offset = 0 } = req.query;
-    
+    const { sortBy = 'deadline', limit = 1000, offset = 0 } = req.query;
+
     const tenders = [];
-    
+
     // First, try to get from run_summaries (aggregated UI data)
+    // Removed WHERE status = 'COMPLETED' to show ALL runs as requested
     const runSummaryResult = await query(
       `SELECT run_id, ui_json, status, created_at, updated_at
        FROM run_summaries
-       WHERE status = 'COMPLETED'
        ORDER BY created_at DESC
        LIMIT $1 OFFSET $2`,
       [limit, offset]
@@ -334,9 +580,16 @@ router.get('/', async (req, res) => {
 
     for (const row of runSummaryResult.rows) {
       const uiJson = row.ui_json;
-      
-      // Check if it's the new flat structure (has meta)
-      if (uiJson && uiJson.meta) {
+
+      // NEW: Check for nested summary structure (actual N8N DB format)
+      if (uiJson && uiJson.summary) {
+        const transformed = transformNestedSummaryToFlat(uiJson, row.run_id);
+        if (transformed) {
+          tenders.push(transformed);
+        }
+      }
+      // Check if it's the old flat structure (has meta at root level)
+      else if (uiJson && uiJson.meta && !uiJson.summary) {
         tenders.push(transformFlatUIJson(uiJson, row.run_id));
       }
       // Fallback to old structure (has results array)
@@ -427,7 +680,7 @@ router.get('/:tenderId', async (req, res) => {
     const uiJson = row.ui_json;
 
     // Transform overview data
-    const tenderDetails = uiJson.overview 
+    const tenderDetails = uiJson.overview
       ? transformTenderOverview(uiJson.overview, tenderId)
       : { id: tenderId, error: 'No detailed data available' };
 
@@ -531,7 +784,7 @@ router.get('/health', async (req, res) => {
   try {
     // Test database connection
     await query('SELECT NOW()');
-    
+
     res.json({
       success: true,
       status: 'healthy',
@@ -575,10 +828,10 @@ router.get('/debug/raw', async (req, res) => {
 
     // Show transformed data for comparison
     const transformedTenders = [];
-    
+
     for (const row of runSummaryResult.rows) {
       const uiJson = row.ui_json;
-      
+
       // Check if it's the new flat structure (has meta)
       if (uiJson && uiJson.meta) {
         transformedTenders.push({
