@@ -96,3 +96,18 @@ Desktop.ini
 *.sqlite
 *.sqlite3
 *.db
+
+# Shared filesystem - ignore actual files, keep structure
+shared/uploads/*
+!shared/uploads/.gitkeep
+shared/extracted/*
+!shared/extracted/.gitkeep
+shared/temp/*
+!shared/temp/.gitkeep
+shared/logs/*
+!shared/logs/.gitkeep
+shared/.metadata/*
+!shared/.metadata/.gitkeep
+!shared/.metadata/locks/
+shared/.metadata/locks/*
+!shared/.metadata/locks/.gitkeep
