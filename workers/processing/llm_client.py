@@ -13,62 +13,82 @@ from workers.core.retry import RetryConfig, retry_with_backoff
 
 def _build_extraction_prompt(text: str, source_filename: str = "document") -> str:
     return (
-        f"Extract tender information from the following document: {source_filename}\n\n"
-        "Return ONLY valid JSON with ALL fields below. Include 'source_document' for EVERY field.\n\n"
+        f"Extract tender information from this document: {source_filename}\n\n"
+        "CRITICAL EXTRACTION RULES:\n"
+        "1. ALL text in *_de fields MUST be in German only\n"
+        "2. NEVER return empty strings - use null if data is missing\n"
+        "3. NEVER use placeholders like 'Unbekannt', 'Unknown', 'TBD', '...' - use null instead\n"
+        "4. DEDUPLICATE within this document - combine similar/identical items\n"
+        "5. Keep ALL extracted text CONCISE:\n"
+        "   - risks: max 140 characters each (1 clear sentence)\n"
+        "   - requirements: max 200 characters each (1-2 sentences)\n"
+        "   - criteria: short phrase (max 80 chars)\n"
+        "   - penalties: short phrase (max 120 chars)\n"
+        "6. Include 'source_document' for EVERY item - always set to current filename\n"
+        "7. Prioritize QUALITY over quantity - extract only clear, actionable information\n"
+        "8. For arrays: return TOP 5 most important items only (pre-filtered, deduplicated)\n\n"
         "Required JSON structure:\n"
         "{\n"
         '  "meta": {\n'
-        '    "tender_id": "...",\n'
-        '    "tender_title": "...",\n'
-        '    "organization": "...",\n'
+        '    "tender_id": "ID from document or null",\n'
+        '    "tender_title": "Main tender title",\n'
+        '    "organization": "Awarding organization name",\n'
         f'    "source_document": "{source_filename}"\n'
         '  },\n'
         '  "executive_summary": {\n'
-        '    "title_de": "...",\n'
-        '    "organization_de": "...",\n'
-        '    "brief_description_de": "...",\n'
-        '    "location_de": "...",\n'
+        '    "title_de": "Kurzfassung Titel (max 100 Zeichen)",\n'
+        '    "organization_de": "Organisation auf Deutsch",\n'
+        '    "brief_description_de": "1-2 Sätze Beschreibung (max 300 Zeichen)",\n'
+        '    "location_de": "Ort/Region",\n'
         f'    "source_document": "{source_filename}"\n'
         '  },\n'
         '  "timeline_milestones": {\n'
-        '    "submission_deadline_de": "YYYY-MM-DD",\n'
-        '    "project_duration_de": "...",\n'
+        '    "submission_deadline_de": "YYYY-MM-DD (exact date or null)",\n'
+        '    "project_duration_de": "z.B. \'6 Monate\' or null",\n'
         f'    "source_document": "{source_filename}"\n'
         '  },\n'
         '  "mandatory_requirements": [\n'
-        '    {"requirement_de": "...", "category_de": "...", "source_document": "' + source_filename + '"}\n'
+        '    {"requirement_de": "Kurze Anforderung (max 200 Zeichen)", "category_de": "Kategorie", "source_document": "' + source_filename + '"}\n'
         '  ],\n'
         '  "risks": [\n'
-        '    {"risk_de": "...", "severity": "high/medium/low", "source_document": "' + source_filename + '"}\n'
+        '    {"risk_de": "Klares Risiko in 1 Satz (max 140 Zeichen)", "severity": "high|medium|low", "source_document": "' + source_filename + '"}\n'
         '  ],\n'
         '  "evaluation_criteria": [\n'
-        '    {"criterion_de": "...", "weight_percent": 0, "source_document": "' + source_filename + '"}\n'
+        '    {"criterion_de": "Bewertungskriterium (max 80 Zeichen)", "weight_percent": 0, "source_document": "' + source_filename + '"}\n'
         '  ],\n'
         '  "economic_analysis": {\n'
-        '    "potentialMargin": {"text": "...", "source_document": "' + source_filename + '"},\n'
-        '    "orderValueEstimated": {"text": "...", "source_document": "' + source_filename + '"},\n'
-        '    "competitiveIntensity": {"text": "...", "source_document": "' + source_filename + '"},\n'
-        '    "logisticsCosts": {"text": "...", "source_document": "' + source_filename + '"},\n'
-        '    "contractRisk": {"text": "...", "source_document": "' + source_filename + '"},\n'
+        '    "potentialMargin": {"text": "Kurze Einschätzung oder null", "source_document": "' + source_filename + '"},\n'
+        '    "orderValueEstimated": {"text": "Auftragswert Schätzung oder null", "source_document": "' + source_filename + '"},\n'
+        '    "competitiveIntensity": {"text": "Wettbewerbsintensität oder null", "source_document": "' + source_filename + '"},\n'
+        '    "logisticsCosts": {"text": "Logistikkosten Hinweise oder null", "source_document": "' + source_filename + '"},\n'
+        '    "contractRisk": {"text": "Vertragsrisiko Einschätzung oder null", "source_document": "' + source_filename + '"},\n'
         '    "criticalSuccessFactors": [\n'
-        '      {"text": "...", "source_document": "' + source_filename + '"}\n'
+        '      {"text": "Erfolgsfaktor (max 100 Zeichen)", "source_document": "' + source_filename + '"}\n'
         '    ]\n'
         '  },\n'
-        '  "service_types": ["..."],\n'
-        '  "certifications_required": ["..."],\n'
-        '  "safety_requirements": ["..."],\n'
-        '  "contract_penalties": ["..."],\n'
-        '  "submission_requirements": ["..."],\n'
+        '  "service_types": ["Leistungsart 1", "Leistungsart 2"],\n'
+        '  "certifications_required": ["Zertifizierung 1 (kurz)", "Zertifizierung 2"],\n'
+        '  "safety_requirements": ["Sicherheitsanforderung 1", "Sicherheitsanforderung 2"],\n'
+        '  "contract_penalties": ["Vertragsstrafe (max 120 Zeichen)", "..."],\n'
+        '  "submission_requirements": ["Einreichungsanforderung", "..."],\n'
         '  "process_steps": [\n'
-        '    {"step": 1, "days_de": "...", "title_de": "...", "description_de": "...", "source_document": "' + source_filename + '"}\n'
+        '    {"step": 1, "days_de": "Tag X", "title_de": "Schritt Titel (max 60 Zeichen)", "description_de": "Kurzbeschreibung (max 150 Zeichen)", "source_document": "' + source_filename + '"}\n'
         '  ],\n'
         '  "missing_evidence_documents": [\n'
-        '    {"document_de": "...", "source_document": "' + source_filename + '"}\n'
+        '    {"document_de": "Fehlender Nachweis", "source_document": "' + source_filename + '"}\n'
         '  ]\n'
         "}\n\n"
+        "IMPORTANT ARRAY HANDLING:\n"
+        "- risks: Return TOP 5 distinct risks sorted by severity (high first)\n"
+        "- mandatory_requirements: Return TOP 5 most critical requirements\n"
+        "- evaluation_criteria: Return TOP 5 criteria sorted by weight_percent (highest first)\n"
+        "- contract_penalties: Return TOP 5 distinct penalties\n"
+        "- certifications_required: Return TOP 5 distinct certifications\n"
+        "- process_steps: Return TOP 6 key timeline steps (avoid duplicates)\n"
+        "- criticalSuccessFactors: Return TOP 3 success factors\n\n"
         "Document content:\n"
         f"{text}\n\n"
-        "Return valid JSON only:"
+        "Return ONLY valid JSON (no markdown, no explanations):"
     )
 
 
@@ -117,16 +137,30 @@ def extract_tender_data(text: str, config: Config, source_filename: str = "docum
 
     @retry_with_backoff(retry_config)
     def _call_llm() -> str:
-        try:
-            response = client.chat.completions.create(
-                model=config.openai_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=config.openai_max_tokens,
-                temperature=0,
-            )
-            return response.choices[0].message.content or ""
-        except Exception as exc:  # noqa: BLE001 - keep retry behavior simple
-            raise _map_openai_error(exc) from exc
+        model_candidates = [
+            "gpt-5.2",
+            "gpt-5.1",
+            "gpt-4o",
+        ]
+        # Allow override while still keeping fallback order
+        if config.openai_model and config.openai_model not in model_candidates:
+            model_candidates.insert(0, config.openai_model)
+
+        last_error: Exception | None = None
+        for model in model_candidates:
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_completion_tokens=config.openai_max_tokens,
+                    temperature=0,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as exc:  # noqa: BLE001 - keep retry behavior simple
+                last_error = exc
+                continue
+
+        raise _map_openai_error(last_error or Exception("LLM request failed"))
 
     raw = _call_llm()
     return _parse_llm_response(raw)

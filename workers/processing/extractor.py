@@ -10,6 +10,7 @@ from workers.core.logging import log_context, setup_logger
 from workers.database import operations
 from workers.processing.chunking import chunk_text
 from workers.processing.llm_client import extract_tender_data
+from workers.processing.embeddings import select_relevant_chunks
 from workers.processing.parsers import parse_file
 from workers.utils.filesystem import resolve_storage_path
 
@@ -71,7 +72,23 @@ def process_file(session: Session, doc_id: str, config: Config) -> None:
             logger.info(f"Split into {len(chunks)} chunks, calling LLM...")
             # Pass filename to LLM for source tracking
             source_filename = file_extraction.filename or "document"
-            chunk_results = [extract_tender_data(chunk, config, source_filename) for chunk in chunks]
+            retrieval_query = (
+                "Extract risks, mandatory requirements, timelines, economic factors, "
+                "penalties, and evaluation criteria"
+            )
+            selected_chunks = select_relevant_chunks(
+                chunks=chunks,
+                query=retrieval_query,
+                config=config,
+                logger=logger,
+                doc_id=doc_id,
+                source_filename=source_filename,
+            )
+            chunks_for_llm = selected_chunks or chunks
+            chunk_results = [
+                extract_tender_data(chunk, config, source_filename)
+                for chunk in chunks_for_llm
+            ]
             final_extraction = merge_extractions(chunk_results)
 
             operations.mark_file_success(session, doc_id, final_extraction)

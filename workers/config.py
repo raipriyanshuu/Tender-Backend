@@ -41,8 +41,8 @@ class Config:
 
     # LLM (Phase 4)
     openai_api_key: str | None = None
-    openai_model: str = "gpt-4o-mini"
-    openai_max_tokens: int = 4096
+    openai_model: str = "gpt-4o"  # Using GPT-4o for better quality extraction
+    openai_max_tokens: int = 16384  # Increased for comprehensive extraction
     openai_rate_limit_rpm: int = 60
 
     # OCR configuration
@@ -138,8 +138,8 @@ def load_config() -> Config:
         retry_max_delay_seconds=float(os.environ.get("RETRY_MAX_DELAY_SECONDS", "60.0")),
         batch_processing_timeout_seconds=int(os.environ.get("BATCH_PROCESSING_TIMEOUT", "1800")),
         openai_api_key=os.environ.get("OPENAI_API_KEY"),
-        openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o-mini"),
-        openai_max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "4096")),
+        openai_model=os.environ.get("OPENAI_MODEL", "gpt-4o"),  # GPT-4o for best quality
+        openai_max_tokens=int(os.environ.get("OPENAI_MAX_TOKENS", "16384")),  # Increased capacity
         openai_rate_limit_rpm=int(os.environ.get("OPENAI_RATE_LIMIT_RPM", "60")),
         enable_ocr=os.environ.get("ENABLE_OCR", "true").lower() in ("true", "1", "yes"),
         ocr_max_pages=int(os.environ.get("OCR_MAX_PAGES", "50")),
