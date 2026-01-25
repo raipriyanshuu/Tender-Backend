@@ -111,15 +111,17 @@ class Config:
         if self.log_format not in {"json", "text"}:
             raise ValueError("LOG_FORMAT must be 'json' or 'text'")
 
-        base_path = Path(self.storage_base_path)
-        if not base_path.exists():
-            raise ValueError(f"STORAGE_BASE_PATH does not exist: {self.storage_base_path}")
-        if not os.access(base_path, os.W_OK):
-            raise ValueError(f"STORAGE_BASE_PATH is not writable: {self.storage_base_path}")
-
         # Validate storage backend
         if self.storage_backend not in {"local", "r2"}:
             raise ValueError("STORAGE_BACKEND must be 'local' or 'r2'")
+
+        # Only validate local storage path when using local backend
+        if self.storage_backend == "local":
+            base_path = Path(self.storage_base_path)
+            if not base_path.exists():
+                raise ValueError(f"STORAGE_BASE_PATH does not exist: {self.storage_base_path}")
+            if not os.access(base_path, os.W_OK):
+                raise ValueError(f"STORAGE_BASE_PATH is not writable: {self.storage_base_path}")
 
         # Validate R2 configuration if using R2
         if self.storage_backend == "r2":
