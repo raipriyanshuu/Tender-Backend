@@ -65,6 +65,18 @@ class Config:
     redis_url: str = "redis://localhost:6379"
     redis_queue_key: str = "tender:jobs"
 
+    # Storage backend
+    storage_backend: str = "local"  # Options: "local" | "r2"
+    storage_environment: str = "prod"  # Environment prefix for R2: "dev" | "staging" | "prod"
+
+    # R2 Configuration (only used when storage_backend="r2")
+    r2_account_id: str | None = None
+    r2_access_key_id: str | None = None
+    r2_secret_access_key: str | None = None
+    r2_bucket_name: str | None = None
+    r2_endpoint_url: str | None = None
+    r2_region: str = "auto"
+
     def validate(self) -> None:
         if not (
             self.database_url.startswith("postgresql://")
@@ -105,6 +117,21 @@ class Config:
         if not os.access(base_path, os.W_OK):
             raise ValueError(f"STORAGE_BASE_PATH is not writable: {self.storage_base_path}")
 
+        # Validate storage backend
+        if self.storage_backend not in {"local", "r2"}:
+            raise ValueError("STORAGE_BACKEND must be 'local' or 'r2'")
+
+        # Validate R2 configuration if using R2
+        if self.storage_backend == "r2":
+            if not self.r2_account_id:
+                raise ValueError("R2_ACCOUNT_ID is required when STORAGE_BACKEND=r2")
+            if not self.r2_access_key_id:
+                raise ValueError("R2_ACCESS_KEY_ID is required when STORAGE_BACKEND=r2")
+            if not self.r2_secret_access_key:
+                raise ValueError("R2_SECRET_ACCESS_KEY is required when STORAGE_BACKEND=r2")
+            if not self.r2_bucket_name:
+                raise ValueError("R2_BUCKET_NAME is required when STORAGE_BACKEND=r2")
+
     def get_storage_path(self, subdir: str) -> str:
         return str(Path(self.storage_base_path) / subdir)
 
@@ -119,6 +146,34 @@ class Config:
 
     def get_logs_path(self) -> str:
         return self.get_storage_path(self.storage_logs_dir)
+
+    def create_storage_adapter(self):
+        """
+        Create storage adapter based on configuration.
+        
+        Returns:
+            StorageAdapter instance (LocalStorageAdapter or R2StorageAdapter)
+        """
+        from workers.storage import LocalStorageAdapter, R2StorageAdapter
+        
+        if self.storage_backend == "local":
+            return LocalStorageAdapter(base_path=self.storage_base_path)
+        elif self.storage_backend == "r2":
+            # Construct endpoint URL if not provided
+            endpoint_url = self.r2_endpoint_url
+            if not endpoint_url and self.r2_account_id:
+                endpoint_url = f"https://{self.r2_account_id}.r2.cloudflarestorage.com"
+            
+            return R2StorageAdapter(
+                account_id=self.r2_account_id,
+                access_key_id=self.r2_access_key_id,
+                secret_access_key=self.r2_secret_access_key,
+                bucket_name=self.r2_bucket_name,
+                environment=self.storage_environment,
+                region=self.r2_region,
+            )
+        else:
+            raise ValueError(f"Unknown storage backend: {self.storage_backend}")
 
 
 def load_config() -> Config:
@@ -146,6 +201,14 @@ def load_config() -> Config:
         gaeb_enabled=os.environ.get("GAEB_ENABLED", "true").lower() in ("true", "1", "yes"),
         redis_url=os.environ.get("REDIS_URL", "redis://localhost:6379"),
         redis_queue_key=os.environ.get("REDIS_QUEUE_KEY", "tender:jobs"),
+        storage_backend=os.environ.get("STORAGE_BACKEND", "local"),
+        storage_environment=os.environ.get("STORAGE_ENVIRONMENT", "prod"),
+        r2_account_id=os.environ.get("R2_ACCOUNT_ID"),
+        r2_access_key_id=os.environ.get("R2_ACCESS_KEY_ID"),
+        r2_secret_access_key=os.environ.get("R2_SECRET_ACCESS_KEY"),
+        r2_bucket_name=os.environ.get("R2_BUCKET_NAME"),
+        r2_endpoint_url=os.environ.get("R2_ENDPOINT_URL"),
+        r2_region=os.environ.get("R2_REGION", "auto"),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         log_format=os.environ.get("LOG_FORMAT", "json"),
         log_file_path=os.environ.get("LOG_FILE_PATH", "/shared/logs/worker.log"),

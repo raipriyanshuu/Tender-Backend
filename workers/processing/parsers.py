@@ -199,21 +199,40 @@ def parse_gaeb(file_path: str) -> str:
         raise ParseError(f"Failed to parse GAEB file: {file_path}") from exc
 
 
-def parse_file(file_path: str, enable_ocr: bool = False, ocr_max_pages: int = 50) -> str:
-    """Parse file based on type, with optional OCR for scanned PDFs."""
+def parse_file(
+    file_path: str,
+    enable_ocr: bool = False,
+    ocr_max_pages: int = 50,
+    temp_file_path: str | None = None,
+) -> str:
+    """
+    Parse file based on type, with optional OCR for scanned PDFs.
+    
+    Args:
+        file_path: Original file path (for type detection)
+        enable_ocr: Enable OCR for scanned PDFs
+        ocr_max_pages: Maximum pages to OCR
+        temp_file_path: Temporary file path (if downloaded from R2)
+        
+    Returns:
+        Extracted text content
+    """
+    # Use temp file path if provided, otherwise use original path
+    actual_path = temp_file_path if temp_file_path else file_path
+    
     file_type = get_file_type(file_path)
     
     if file_type == "pdf":
-        return parse_pdf(file_path, enable_ocr=enable_ocr, ocr_max_pages=ocr_max_pages)
+        return parse_pdf(actual_path, enable_ocr=enable_ocr, ocr_max_pages=ocr_max_pages)
     if file_type == "word":
-        return parse_word(file_path)
+        return parse_word(actual_path)
     if file_type == "excel":
-        return parse_excel(file_path)
+        return parse_excel(actual_path)
     if file_type == "csv":
-        return parse_csv(file_path)
+        return parse_csv(actual_path)
     if file_type == "text":
-        return parse_text(file_path)
+        return parse_text(actual_path)
     if file_type == "gaeb":
-        return parse_gaeb(file_path)
+        return parse_gaeb(actual_path)
     
     raise PermanentError(f"Unsupported file type: {file_path}")

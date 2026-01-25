@@ -2,9 +2,9 @@ import express from "express";
 import multer from "multer";
 import crypto from "crypto";
 import path from "path";
-import fs from "fs/promises";
 import { query } from "../db.js";
 import { uploadRateLimiter } from "../middleware/rateLimiter.js";
+import { createStorageAdapter } from "../storage/index.js";
 
 const router = express.Router();
 
@@ -16,10 +16,8 @@ const upload = multer({
   limits: {
     fileSize: MAX_FILE_SIZE_BYTES,
   },
-}); 
+});
 
-const STORAGE_BASE_PATH =
-  process.env.STORAGE_BASE_PATH || path.join(process.cwd(), "shared");
 const STORAGE_UPLOADS_DIR = process.env.STORAGE_UPLOADS_DIR || "uploads";
 
 router.post("/upload-tender", uploadRateLimiter, upload.single("file"), async (req, res) => {
@@ -33,7 +31,7 @@ router.post("/upload-tender", uploadRateLimiter, upload.single("file"), async (r
     }
 
     if (req.file.size > MAX_FILE_SIZE_BYTES) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `File size exceeds maximum limit of ${MAX_FILE_SIZE_MB}MB`,
         max_size_mb: MAX_FILE_SIZE_MB,
         file_size_mb: Math.round(req.file.size / (1024 * 1024)),
@@ -41,14 +39,22 @@ router.post("/upload-tender", uploadRateLimiter, upload.single("file"), async (r
     }
 
     const batchId = `batch_${crypto.randomUUID()}`;
-    const uploadsPath = path.join(STORAGE_BASE_PATH, STORAGE_UPLOADS_DIR);
-    await fs.mkdir(uploadsPath, { recursive: true });
-
     const fileName = `${batchId}.zip`;
-    const fullPath = path.join(uploadsPath, fileName);
-    await fs.writeFile(fullPath, req.file.buffer);
+    const relativeZipPath = path.join(STORAGE_UPLOADS_DIR, fileName).replace(/\\/g, '/');
 
-    const relativeZipPath = path.join(STORAGE_UPLOADS_DIR, fileName);
+    // Create storage adapter and write file
+    const storage = createStorageAdapter();
+
+    // Log storage backend type
+    const backendType = process.env.STORAGE_BACKEND || 'local';
+    console.log(`[Upload] Storage backend: ${backendType}`);
+    console.log(`[Upload] Uploading file: ${relativeZipPath}`);
+    console.log(`[Upload] File size: ${Math.round(req.file.size / 1024)}KB`);
+
+    await storage.writeFile(relativeZipPath, req.file.buffer);
+
+    console.log(`[Upload] ✅ File uploaded successfully to ${backendType} storage`);
+    console.log(`[Upload] Storage key: ${relativeZipPath}`);
 
     await query(
       `
@@ -62,7 +68,7 @@ router.post("/upload-tender", uploadRateLimiter, upload.single("file"), async (r
   } catch (err) {
     console.error("Upload error:", err.message);
     if (err.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: `File size exceeds maximum limit of ${MAX_FILE_SIZE_MB}MB`,
         max_size_mb: MAX_FILE_SIZE_MB,
       });

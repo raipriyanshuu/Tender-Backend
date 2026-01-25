@@ -49,21 +49,33 @@ def process_file(session: Session, doc_id: str, config: Config) -> None:
             if not file_extraction.file_path:
                 raise ValueError(f"file_path is missing for doc_id={doc_id}")
 
-            full_path = resolve_storage_path(file_extraction.file_path, config.storage_base_path)
-            logger.info(f"Processing file: {full_path} (type: {file_extraction.file_type})")
+            # Create storage adapter
+            storage = config.create_storage_adapter()
             
-            # Check if file exists
-            import os
-            if not os.path.exists(full_path):
-                raise ValueError(f"File not found at path: {full_path} (from relative path: {file_extraction.file_path})")
+            # Import temp file manager
+            from workers.storage.temp_file_manager import TempFileManager
+            temp_manager = TempFileManager(storage)
             
-            # Parse file with OCR support for scanned PDFs
-            raw_text = parse_file(
-                full_path,
-                enable_ocr=config.enable_ocr,
-                ocr_max_pages=config.ocr_max_pages
-            )
-            logger.info(f"Parsed {len(raw_text)} characters from {full_path}")
+            object_key = file_extraction.file_path
+            logger.info(f"Processing file from storage: {object_key} (type: {file_extraction.file_type})")
+            
+            # Get file extension for temp file
+            file_extension = temp_manager.get_file_extension(object_key)
+            
+            # Download to temp file and parse
+            with temp_manager.download_to_temp(object_key, suffix=file_extension) as temp_path:
+                logger.info(f"Downloaded to temp file: {temp_path}")
+                
+                # Parse file with OCR support for scanned PDFs
+                raw_text = parse_file(
+                    file_path=object_key,  # For type detection
+                    temp_file_path=temp_path,  # Actual file to parse
+                    enable_ocr=config.enable_ocr,
+                    ocr_max_pages=config.ocr_max_pages
+                )
+                logger.info(f"Parsed {len(raw_text)} characters from {object_key}")
+            
+            # Temp file is automatically deleted after context manager exits
             
             chunks = chunk_text(raw_text, max_chunk_size=3000, overlap=200)
             if not chunks:
