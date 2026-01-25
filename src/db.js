@@ -5,12 +5,25 @@ dotenv.config();
 
 const { Pool } = pg;
 
+const resolveSslOption = () => {
+  const databaseUrl = process.env.DATABASE_URL || '';
+  const sslModeDisabled = databaseUrl.includes('sslmode=disable');
+  const isLocalhost =
+    databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1');
+
+  if (sslModeDisabled || isLocalhost) {
+    return false;
+  }
+  if (process.env.DATABASE_SSL === 'true') {
+    return { rejectUnauthorized: false };
+  }
+  return { rejectUnauthorized: false }; // Default for Supabase-style connections
+};
+
 // Create PostgreSQL connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false // Required for Supabase connections
-  },
+  ssl: resolveSslOption(),
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -32,10 +45,15 @@ export const query = async (text, params) => {
   try {
     const res = await pool.query(text, params);
     const duration = Date.now() - start;
-    console.log('Executed query', { text, duration, rows: res.rowCount });
+    if (process.env.NODE_ENV === 'development') {
+      const truncatedText = text.length > 100 ? text.substring(0, 100) + '...' : text;
+      console.log('Executed query', { text: truncatedText, duration, rows: res.rowCount });
+    } else {
+      console.log('Executed query', { duration, rows: res.rowCount });
+    }
     return res;
   } catch (error) {
-    console.error('Database query error:', error);
+    console.error('Database query error:', error.message);
     throw error;
   }
 };

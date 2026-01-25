@@ -580,49 +580,28 @@ router.get('/', async (req, res) => {
 
     for (const row of runSummaryResult.rows) {
       const uiJson = row.ui_json;
+      let transformed = null;
 
       // NEW: Check for nested summary structure (actual N8N DB format)
       if (uiJson && uiJson.summary) {
-        const transformed = transformNestedSummaryToFlat(uiJson, row.run_id);
-        if (transformed) {
-          tenders.push(transformed);
-        }
+        transformed = transformNestedSummaryToFlat(uiJson, row.run_id);
       }
       // Check if it's the old flat structure (has meta at root level)
       else if (uiJson && uiJson.meta && !uiJson.summary) {
-        tenders.push(transformFlatUIJson(uiJson, row.run_id));
+        transformed = transformFlatUIJson(uiJson, row.run_id);
       }
       // Fallback to old structure (has results array)
       else if (uiJson && uiJson.results && Array.isArray(uiJson.results)) {
-        for (const item of uiJson.results) {
-          tenders.push(transformTenderResult(item));
-        }
+        transformed = transformTenderResult(uiJson.results[0]);
       }
-    }
 
-    // If no data from run_summaries, try file_extractions (raw LLM data)
-    if (tenders.length === 0) {
-      const fileExtractionsResult = await query(
-        `SELECT doc_id, filename, extracted_json, status, created_at
-         FROM file_extractions
-         WHERE status = 'SUCCESS' 
-           AND extracted_json IS NOT NULL
-           AND extracted_json != '{}'::jsonb
-         ORDER BY created_at DESC
-         LIMIT $1 OFFSET $2`,
-        [limit, offset]
-      );
-
-      for (const row of fileExtractionsResult.rows) {
-        try {
-          const extractedJson = row.extracted_json;
-          if (extractedJson && typeof extractedJson === 'object') {
-            const tender = transformLLMExtraction(extractedJson, row.filename, row.doc_id);
-            tenders.push(tender);
-          }
-        } catch (err) {
-          console.error(`Error transforming extraction for ${row.doc_id}:`, err);
-        }
+      if (transformed) {
+        transformed.runId = row.run_id;
+        transformed.tenderId = uiJson?.meta?.tender_id || uiJson?.tender_id || transformed.id;
+        transformed.status = row.status;
+        transformed.createdAt = row.created_at;
+        transformed.updatedAt = row.updated_at;
+        tenders.push(transformed);
       }
     }
 
@@ -657,11 +636,13 @@ router.get('/:tenderId', async (req, res) => {
   try {
     const { tenderId } = req.params;
 
-    // Find tender in run_summaries by tender_id in ui_json
+    // Prefer direct run_id match first
     const result = await query(
-      `SELECT run_id, ui_json, status, created_at
+      `SELECT run_id, ui_json, status, created_at, updated_at
        FROM run_summaries
-       WHERE ui_json->>'tender_id' = $1
+       WHERE run_id = $1
+          OR ui_json->'meta'->>'tender_id' = $1
+          OR ui_json->>'tender_id' = $1
           OR ui_json->'overview'->>'tender_id' = $1
           OR ui_json->'results'->0->>'tender_id' = $1
        ORDER BY created_at DESC
@@ -678,15 +659,32 @@ router.get('/:tenderId', async (req, res) => {
 
     const row = result.rows[0];
     const uiJson = row.ui_json;
+    let transformed = null;
 
-    // Transform overview data
-    const tenderDetails = uiJson.overview
-      ? transformTenderOverview(uiJson.overview, tenderId)
-      : { id: tenderId, error: 'No detailed data available' };
+    if (uiJson && uiJson.summary) {
+      transformed = transformNestedSummaryToFlat(uiJson, row.run_id);
+    } else if (uiJson && uiJson.meta && !uiJson.summary) {
+      transformed = transformFlatUIJson(uiJson, row.run_id);
+    } else if (uiJson && uiJson.results && Array.isArray(uiJson.results)) {
+      transformed = transformTenderResult(uiJson.results[0]);
+    }
+
+    if (!transformed) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tender data not available'
+      });
+    }
+
+    transformed.runId = row.run_id;
+    transformed.tenderId = uiJson?.meta?.tender_id || uiJson?.tender_id || transformed.id;
+    transformed.status = row.status;
+    transformed.createdAt = row.created_at;
+    transformed.updatedAt = row.updated_at;
 
     res.json({
       success: true,
-      data: tenderDetails
+      data: transformed
     });
 
   } catch (error) {

@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GAEB xmlns="http://www.gaeb.de/GAEB_DA_XML/200407">
+  <GAEBInfo>
+    <Version>3.2</Version>
+    <Date>2026-01-23</Date>
+  </GAEBInfo>
+  <Award>
+    <BoQTitle>Neubau Bürogebäude - Leistungsverzeichnis</BoQTitle>
+    <BoQInfo>
+      <Name>Leistungsverzeichnis Rohbau</Name>
+      <Description>Ausschreibung für Rohbauarbeiten</Description>
+    </BoQInfo>
+    <BoQBody>
+      <BoQCtgy>
+        <LblTx>Erdarbeiten</LblTx>
+        <BoQBody>
+          <Itemlist>
+            <Item>
+              <OZ>01.01.010</OZ>
+              <Description>
+                <CompleteText>
+                  <DetailTxt>
+                    <Text>Oberboden abtragen, Dicke 20 cm, seitlich lagern</Text>
+                  </DetailTxt>
+                </CompleteText>
+              </Description>
+              <Qty>450</Qty>
+              <QU>m³</QU>
+              <UP>12.50</UP>
+            </Item>
+            <Item>
+              <OZ>01.01.020</OZ>
+              <Description>
+                <CompleteText>
+                  <DetailTxt>
+                    <Text>Baugrube ausheben, Tiefe bis 3 m</Text>
+                  </DetailTxt>
+                </CompleteText>
+              </Description>
+              <Qty>850</Qty>
+              <QU>m³</QU>
+              <UP>18.75</UP>
+            </Item>
+          </Itemlist>
+        </BoQBody>
+      </BoQCtgy>
+      <BoQCtgy>
+        <LblTx>Betonarbeiten</LblTx>
+        <BoQBody>
+          <Itemlist>
+            <Item>
+              <OZ>02.01.010</OZ>
+              <Description>
+                <CompleteText>
+                  <DetailTxt>
+                    <Text>Stahlbeton C25/30 für Fundamente einbauen</Text>
+                  </DetailTxt>
+                </CompleteText>
+              </Description>
+              <Qty>125</Qty>
+              <QU>m³</QU>
+              <UP>285.00</UP>
+            </Item>
+          </Itemlist>
+        </BoQBody>
+      </BoQCtgy>
+    </BoQBody>
+    <Note>
+      <Text>Alle Preise verstehen sich netto. Ausführungsfrist: 6 Monate.</Text>
+    </Note>
+  </Award>
+</GAEB>

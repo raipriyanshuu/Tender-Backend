@@ -209,6 +209,14 @@ Get all files processed in a specific N8N run.
 }
 ```
 
+---
+
+### Batch Summary (Phase 9)
+```
+GET /api/batches/:batchId/summary
+```
+Returns the aggregated `run_summaries` record for a batch once aggregation finishes.
+
 ## 🗄️ Database Schema
 
 ### `file_extractions` Table

@@ -3,6 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import tendersRouter from './routes/tenders.js';
 import uploadRoutes from './routes/upload.js';
+import batchRoutes from './routes/batches.js';
+import healthRoutes from './routes/health.js';
+import monitoringRoutes from './routes/monitoring.js';
+import queueRoutes from './routes/queue.js';
+import pool from './db.js';
 
 // Load environment variables
 dotenv.config();
@@ -50,7 +55,11 @@ app.use((req, res, next) => {
 
 // Routes
 app.use(uploadRoutes);
+app.use(batchRoutes);
 app.use('/api/tenders', tendersRouter);
+app.use(healthRoutes);
+app.use(monitoringRoutes);
+app.use(queueRoutes);
 
 
 app.get('/ping', (req, res) => {
@@ -92,9 +101,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`
+const startServer = async () => {
+  try {
+    await pool.query('SELECT 1');
+    console.log('✅ Database connectivity verified on startup');
+  } catch (error) {
+    console.error('❌ Database connection failed on startup:', error.message);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                       ║
 ║   🚀 Tender Backend API Server                       ║
@@ -107,7 +124,11 @@ app.listen(PORT, () => {
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
   `);
-});
+  });
+};
+
+// Start server
+startServer();
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

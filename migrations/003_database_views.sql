@@ -49,7 +49,8 @@ SELECT
   ROUND(AVG(fe.processing_duration_ms) FILTER (WHERE fe.status = 'SUCCESS') / 1000.0, 2) as avg_file_processing_seconds
 
 FROM processing_jobs pj
-LEFT JOIN file_extractions fe ON pj.batch_id = fe.run_id
+-- FIX: Join on effective run_id (handles both batch_id and run_id semantics)
+LEFT JOIN file_extractions fe ON COALESCE(pj.run_id, pj.batch_id) = fe.run_id
 GROUP BY pj.id, pj.batch_id, pj.status, pj.zip_path, pj.total_files, pj.created_at, pj.updated_at, pj.completed_at
 ORDER BY pj.created_at DESC;
 

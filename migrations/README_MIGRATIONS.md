@@ -2,6 +2,30 @@
 
 This directory contains SQL migration files for the tender processing system.
 
+## ⚠️ QUICK FIX: If Your DB Only Has `file_extractions` + `run_summaries`
+
+**You're missing required tables!** Run this **ONE** command from the `tenderBackend` directory:
+
+```powershell
+node run-migration.js 001_002_003_005_consolidated_idempotent.sql
+```
+
+This consolidated migration safely adds all missing tables, views, and columns. It's **idempotent** (safe to run multiple times).
+
+**Then verify:**
+```powershell
+node run-migration.js verify
+```
+
+**Expected output:**
+```
+✅ All expected tables and views are present!
+```
+
+See `SCHEMA_FIX_INSTRUCTIONS.md` for detailed instructions.
+
+---
+
 ## Migration Files
 
 ### 001_processing_jobs_table.sql
@@ -80,6 +104,31 @@ This directory contains SQL migration files for the tender processing system.
 4. **test_batch_004** - Fresh batch (just queued)
 
 **⚠️ WARNING**: Only run in development! Clears existing test data.
+
+### 005_monitoring_tables.sql
+**Purpose**: Create monitoring infrastructure
+
+**Creates**:
+- `system_alerts` table - System event logging
+- `error_summary_by_type` view - Error aggregation
+
+### 001_002_003_005_consolidated_idempotent.sql (✨ RECOMMENDED)
+**Purpose**: Single idempotent migration that applies all schema changes at once
+
+**Safe to run:**
+- Multiple times (idempotent)
+- On partially migrated databases
+- On fresh databases with only `file_extractions` + `run_summaries`
+
+**Applies:**
+- All changes from 001, 002, 003, and 005
+- RLS policies (checks `pg_policies` to avoid duplicates)
+- Uses `IF NOT EXISTS` for all objects
+
+**Use when:**
+- Starting fresh with this backend
+- Your DB only has the original N8N tables
+- You want to apply all migrations at once
 
 ## How to Run Migrations
 
