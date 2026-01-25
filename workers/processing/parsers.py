@@ -22,12 +22,13 @@ except ImportError:
     pass
 
 # GAEB imports (optional - only if GAEB_ENABLED=true)
+# DISABLED FOR PRODUCTION - Python 3.13 compatibility issues
 _GAEB_AVAILABLE = False
-try:
-    from lxml import etree
-    _GAEB_AVAILABLE = True
-except ImportError:
-    pass
+# try:
+#     from lxml import etree
+#     _GAEB_AVAILABLE = True
+# except ImportError:
+#     pass
 
 
 def _ocr_pdf_page(image) -> str:
@@ -121,82 +122,10 @@ def parse_text(file_path: str) -> str:
         raise ParseError(f"Failed to parse text file: {file_path}") from exc
 
 
-def parse_gaeb(file_path: str) -> str:
-    """Parse GAEB XML files (German tender exchange format) into normalized text."""
-    if not _GAEB_AVAILABLE:
-        raise ParseError("GAEB parsing requires lxml library. Install with: pip install lxml")
-    
-    try:
-        tree = etree.parse(file_path)
-        root = tree.getroot()
-        
-        # GAEB XML has multiple namespaces and versions (X83, X84, X89, etc.)
-        # We'll extract key elements in a version-agnostic way
-        
-        chunks = []
-        chunks.append("=== GAEB LEISTUNGSVERZEICHNIS ===\n")
-        
-        # Extract project info
-        for award in root.xpath("//*[local-name()='Award']"):
-            title = award.xpath(".//*[local-name()='BoQTitle']/text()")
-            if title:
-                chunks.append(f"Projekt: {title[0]}\n")
-        
-        # Extract Leistungsverzeichnis (Bill of Quantities)
-        for boq in root.xpath("//*[local-name()='BoQ']"):
-            boq_info = boq.xpath(".//*[local-name()='BoQInfo']")
-            if boq_info:
-                for info in boq_info:
-                    name = info.xpath(".//*[local-name()='Name']/text()")
-                    if name:
-                        chunks.append(f"\n## {name[0]}")
-        
-        # Extract items/positions
-        for item in root.xpath("//*[local-name()='Item']"):
-            # Item number/OZ
-            oz = item.xpath(".//*[local-name()='OZ']/text()")
-            oz_text = oz[0] if oz else "N/A"
-            
-            # Description
-            desc = item.xpath(".//*[local-name()='Description']//text()")
-            desc_text = " ".join(desc) if desc else ""
-            
-            # Quantity
-            qty = item.xpath(".//*[local-name()='Qty']/text()")
-            qty_text = qty[0] if qty else ""
-            
-            # Unit
-            unit = item.xpath(".//*[local-name()='QU']/text()")
-            unit_text = unit[0] if unit else ""
-            
-            # Unit price (if exists)
-            unit_price = item.xpath(".//*[local-name()='UP']/text()")
-            price_text = f" | Preis: {unit_price[0]}" if unit_price else ""
-            
-            if desc_text:
-                chunks.append(f"{oz_text} | {desc_text} | Menge: {qty_text} {unit_text}{price_text}")
-        
-        # Extract notes/remarks
-        for note in root.xpath("//*[local-name()='Note'] | //*[local-name()='Remark']"):
-            note_text = " ".join(note.xpath(".//text()"))
-            if note_text.strip():
-                chunks.append(f"\nHinweis: {note_text}")
-        
-        result = "\n".join(chunks)
-        
-        if not result.strip() or len(result) < 50:
-            # If extraction yielded nothing meaningful, try raw text
-            all_text = " ".join(root.xpath("//text()"))
-            if len(all_text.strip()) > 50:
-                return all_text
-            raise ParseError(f"GAEB file appears empty or unreadable: {file_path}")
-        
-        return result
-        
-    except etree.XMLSyntaxError as exc:
-        raise ParseError(f"Invalid GAEB XML format: {file_path}") from exc
-    except Exception as exc:  # noqa: BLE001
-        raise ParseError(f"Failed to parse GAEB file: {file_path}") from exc
+# GAEB PARSING DISABLED FOR PRODUCTION - Python 3.13 compatibility issues
+# def parse_gaeb(file_path: str) -> str:
+#     """Parse GAEB XML files (German tender exchange format) into normalized text."""
+#     raise ParseError("GAEB parsing is disabled in production due to Python 3.13 compatibility issues")
 
 
 def parse_file(
@@ -232,7 +161,8 @@ def parse_file(
         return parse_csv(actual_path)
     if file_type == "text":
         return parse_text(actual_path)
-    if file_type == "gaeb":
-        return parse_gaeb(actual_path)
+    # GAEB PARSING DISABLED FOR PRODUCTION
+    # if file_type == "gaeb":
+    #     return parse_gaeb(actual_path)
     
     raise PermanentError(f"Unsupported file type: {file_path}")
