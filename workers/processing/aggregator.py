@@ -19,6 +19,16 @@ def _normalize_text(text: str) -> str:
     return text
 
 
+def _safe_numeric(value: Any, default: float = 0.0) -> float:
+    """Safely convert value to numeric, returning default if None or invalid."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def _is_placeholder(text: Any) -> bool:
     """Check if text is a placeholder/empty value"""
     if not text:
@@ -87,15 +97,15 @@ def _deduplicate_criteria(criteria: list[dict]) -> list[dict]:
         normalized = _normalize_text(criterion.get('criterion_de', ''))
         if not normalized:
             continue
-        weight = criterion.get('weight_percent', 0)
+        weight = _safe_numeric(criterion.get('weight_percent'), 0)
         if normalized in seen:
             # Sum weights for duplicates
-            seen[normalized]['weight_percent'] = seen[normalized].get('weight_percent', 0) + weight
+            seen[normalized]['weight_percent'] = _safe_numeric(seen[normalized].get('weight_percent'), 0) + weight
         else:
             seen[normalized] = criterion.copy()
     
     # Sort by weight descending
-    result = sorted(seen.values(), key=lambda x: -x.get('weight_percent', 0))
+    result = sorted(seen.values(), key=lambda x: -_safe_numeric(x.get('weight_percent'), 0))
     return result[:5]  # Top 5
 
 
