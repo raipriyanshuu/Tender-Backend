@@ -52,7 +52,7 @@ router.get("/api/batches/:batchId/files", async (req, res) => {
 
 router.get("/api/batches/:batchId/summary", async (req, res) => {
   const { batchId } = req.params;
-  
+
   // Get batch info
   const job = await query(
     "SELECT run_id, batch_id, status FROM processing_jobs WHERE batch_id = $1",
@@ -61,38 +61,41 @@ router.get("/api/batches/:batchId/summary", async (req, res) => {
   if (!job.rows[0]) {
     return res.status(404).json({ error: "Batch not found" });
   }
-  
+
   const runId = job.rows[0].run_id || job.rows[0].batch_id;
-  
+
   // Try to get existing summary
   const summary = await query(
     "SELECT * FROM run_summaries WHERE run_id IN ($1, $2) ORDER BY created_at DESC LIMIT 1",
     [runId, job.rows[0].batch_id]
   );
-  
+
   if (summary.rows[0]) {
-    return res.json(summary.rows[0]);
+    return res.json({
+      success: true,
+      data: summary.rows[0]
+    });
   }
-  
+
   // ON-DEMAND AGGREGATION: If summary missing but batch is done, trigger aggregation
   console.log(`[Batches] Summary not found for batch ${batchId}, checking if batch is complete`);
-  
+
   const status = await query(
     "SELECT * FROM batch_status_summary WHERE batch_id = $1",
     [batchId]
   );
-  
+
   if (!status.rows[0]) {
     return res.status(404).json({ error: "Summary not found" });
   }
-  
+
   const batchStatus = status.rows[0];
   const filesSuccess = parseInt(batchStatus.files_success || 0);
   const filesFailed = parseInt(batchStatus.files_failed || 0);
   const filesProcessing = parseInt(batchStatus.files_processing || 0);
   const filesPending = parseInt(batchStatus.files_pending || 0);
   const totalFiles = parseInt(batchStatus.total_files || 0);
-  
+
   console.log(`[Batches] Batch ${batchId} status:`, {
     filesSuccess,
     filesFailed,
@@ -101,7 +104,7 @@ router.get("/api/batches/:batchId/summary", async (req, res) => {
     totalFiles,
     sum: filesSuccess + filesFailed
   });
-  
+
   // If batch is complete but summary is missing, trigger on-demand aggregation
   if (
     totalFiles > 0 &&
@@ -110,13 +113,13 @@ router.get("/api/batches/:batchId/summary", async (req, res) => {
     (filesSuccess + filesFailed) >= totalFiles
   ) {
     console.log(`[Batches] Batch ${batchId} is complete but summary is missing - triggering on-demand aggregation`);
-    
+
     try {
       // Update batch status to completed if still in processing
       if (job.rows[0].status === "processing") {
         const finalStatus = filesFailed > 0 ? "completed_with_errors" : "completed";
         console.log(`[Batches] Updating batch ${batchId} status from processing to ${finalStatus}`);
-        
+
         await query(
           `UPDATE processing_jobs 
            SET status = $2, completed_at = NOW(), updated_at = NOW() 
@@ -124,13 +127,13 @@ router.get("/api/batches/:batchId/summary", async (req, res) => {
           [batchId, finalStatus]
         );
       }
-      
+
       // Enqueue aggregate job
       const { enqueueAggregateJob } = await import("../services/queueClient.js");
       await enqueueAggregateJob(batchId);
-      
+
       console.log(`[Batches] Aggregate job enqueued for batch ${batchId}`);
-      
+
       // Return 202 Accepted to indicate summary is being generated
       return res.status(202).json({
         message: "Summary is being generated. Please retry in a few seconds.",
@@ -142,9 +145,9 @@ router.get("/api/batches/:batchId/summary", async (req, res) => {
       return res.status(500).json({ error: "Failed to trigger summary generation" });
     }
   }
-  
+
   // Batch is not complete yet or in unexpected state
-  return res.status(404).json({ 
+  return res.status(404).json({
     error: "Summary not found",
     hint: "Batch may still be processing"
   });
