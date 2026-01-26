@@ -41,7 +41,7 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         '  "executive_summary": {\n'
         '    "title_de": "Kurzfassung Titel (max 100 Zeichen)",\n'
         '    "organization_de": "Organisation auf Deutsch",\n'
-        '    "brief_description_de": "1-2 Sätze Beschreibung (max 300 Zeichen)",\n'
+        '    "brief_description_de": "Detaillierte Zusammenfassung der Ausschreibung (~1000 Wörter). Beschreiben Sie: 1) Hauptzweck und Umfang der Ausschreibung, 2) Wichtigste Anforderungen und Leistungen, 3) Besondere Bedingungen oder Herausforderungen, 4) Relevante technische Details, 5) Vertragliche Rahmenbedingungen. Diese Zusammenfassung sollte jedem Leser ein vollständiges Verständnis der Ausschreibung ermöglichen.",\n'
         '    "location_de": "Ort/Region",\n'
         f'    "source_document": "{source_filename}",\n'
         '    "page_number": null\n'
