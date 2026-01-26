@@ -356,10 +356,8 @@ function transformFlatUIJson(uiJson, runId) {
   // Extract risk texts
   const riskTexts = risks.map(r => r.risk_de || r.risk || '').filter(Boolean);
 
-  // Build title with fallbacks
-  const title = meta.tender_id
-    ? `Ausschreibung ${meta.tender_id}`
-    : execSummary.brief_description_de?.substring(0, 50) || 'Untitled Tender';
+  // Build title with fallbacks - use tender_title and organization for better display
+  const title = meta.tender_title || execSummary.brief_description_de?.substring(0, 100) || `Ausschreibung ${meta.tender_id}` || 'Untitled Tender';
 
   // Buyer with fallbacks - try to extract from commercials.other_de if organization is missing
   let buyer = meta.organization;
