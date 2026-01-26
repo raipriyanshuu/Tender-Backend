@@ -24,7 +24,9 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         "   - requirements: max 200 characters each (1-2 sentences)\n"
         "   - criteria: short phrase (max 80 chars)\n"
         "   - penalties: short phrase (max 120 chars)\n"
-        "6. Include 'source_document' for EVERY item - always set to current filename\n"
+        "6. Include 'source_document' AND 'page_number' for EVERY item\n"
+        "   - source_document: always set to current filename\n"
+        "   - page_number: the page number where this information was found (integer or null if unknown)\n"
         "7. Prioritize QUALITY over quantity - extract only clear, actionable information\n"
         "8. For arrays: return TOP 5 most important items only (pre-filtered, deduplicated)\n\n"
         "Required JSON structure:\n"
@@ -33,37 +35,40 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         '    "tender_id": "ID from document or null",\n'
         '    "tender_title": "Main tender title",\n'
         '    "organization": "Awarding organization name",\n'
-        f'    "source_document": "{source_filename}"\n'
+        f'    "source_document": "{source_filename}",\n'
+        '    "page_number": null\n'
         '  },\n'
         '  "executive_summary": {\n'
         '    "title_de": "Kurzfassung Titel (max 100 Zeichen)",\n'
         '    "organization_de": "Organisation auf Deutsch",\n'
         '    "brief_description_de": "1-2 Sätze Beschreibung (max 300 Zeichen)",\n'
         '    "location_de": "Ort/Region",\n'
-        f'    "source_document": "{source_filename}"\n'
+        f'    "source_document": "{source_filename}",\n'
+        '    "page_number": null\n'
         '  },\n'
         '  "timeline_milestones": {\n'
         '    "submission_deadline_de": "YYYY-MM-DD (exact date or null)",\n'
         '    "project_duration_de": "z.B. \'6 Monate\' or null",\n'
-        f'    "source_document": "{source_filename}"\n'
+        f'    "source_document": "{source_filename}",\n'
+        '    "page_number": null\n'
         '  },\n'
         '  "mandatory_requirements": [\n'
-        '    {"requirement_de": "Kurze Anforderung (max 200 Zeichen)", "category_de": "Kategorie", "source_document": "' + source_filename + '"}\n'
+        '    {"requirement_de": "Kurze Anforderung (max 200 Zeichen)", "category_de": "Kategorie", "source_document": "' + source_filename + '", "page_number": null}\n'
         '  ],\n'
         '  "risks": [\n'
-        '    {"risk_de": "Klares Risiko in 1 Satz (max 140 Zeichen)", "severity": "high|medium|low", "source_document": "' + source_filename + '"}\n'
+        '    {"risk_de": "Klares Risiko in 1 Satz (max 140 Zeichen)", "severity": "high|medium|low", "source_document": "' + source_filename + '", "page_number": null}\n'
         '  ],\n'
         '  "evaluation_criteria": [\n'
-        '    {"criterion_de": "Bewertungskriterium (max 80 Zeichen)", "weight_percent": 0, "source_document": "' + source_filename + '"}\n'
+        '    {"criterion_de": "Bewertungskriterium (max 80 Zeichen)", "weight_percent": 0, "source_document": "' + source_filename + '", "page_number": null}\n'
         '  ],\n'
         '  "economic_analysis": {\n'
-        '    "potentialMargin": {"text": "Kurze Einschätzung oder null", "source_document": "' + source_filename + '"},\n'
-        '    "orderValueEstimated": {"text": "Auftragswert Schätzung oder null", "source_document": "' + source_filename + '"},\n'
-        '    "competitiveIntensity": {"text": "Wettbewerbsintensität oder null", "source_document": "' + source_filename + '"},\n'
-        '    "logisticsCosts": {"text": "Logistikkosten Hinweise oder null", "source_document": "' + source_filename + '"},\n'
-        '    "contractRisk": {"text": "Vertragsrisiko Einschätzung oder null", "source_document": "' + source_filename + '"},\n'
+        '    "potentialMargin": {"text": "Kurze Einschätzung oder null", "source_document": "' + source_filename + '", "page_number": null},\n'
+        '    "orderValueEstimated": {"text": "Auftragswert Schätzung oder null", "source_document": "' + source_filename + '", "page_number": null},\n'
+        '    "competitiveIntensity": {"text": "Wettbewerbsintensität oder null", "source_document": "' + source_filename + '", "page_number": null},\n'
+        '    "logisticsCosts": {"text": "Logistikkosten Hinweise oder null", "source_document": "' + source_filename + '", "page_number": null},\n'
+        '    "contractRisk": {"text": "Vertragsrisiko Einschätzung oder null", "source_document": "' + source_filename + '", "page_number": null},\n'
         '    "criticalSuccessFactors": [\n'
-        '      {"text": "Erfolgsfaktor (max 100 Zeichen)", "source_document": "' + source_filename + '"}\n'
+        '      {"text": "Erfolgsfaktor (max 100 Zeichen)", "source_document": "' + source_filename + '", "page_number": null}\n'
         '    ]\n'
         '  },\n'
         '  "service_types": ["Leistungsart 1", "Leistungsart 2"],\n'
@@ -72,10 +77,10 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         '  "contract_penalties": ["Vertragsstrafe (max 120 Zeichen)", "..."],\n'
         '  "submission_requirements": ["Einreichungsanforderung", "..."],\n'
         '  "process_steps": [\n'
-        '    {"step": 1, "days_de": "Tag X", "title_de": "Schritt Titel (max 60 Zeichen)", "description_de": "Kurzbeschreibung (max 150 Zeichen)", "source_document": "' + source_filename + '"}\n'
+        '    {"step": 1, "days_de": "Tag X", "title_de": "Schritt Titel (max 60 Zeichen)", "description_de": "Kurzbeschreibung (max 150 Zeichen)", "source_document": "' + source_filename + '", "page_number": null}\n'
         '  ],\n'
         '  "missing_evidence_documents": [\n'
-        '    {"document_de": "Fehlender Nachweis", "source_document": "' + source_filename + '"}\n'
+        '    {"document_de": "Fehlender Nachweis", "source_document": "' + source_filename + '", "page_number": null}\n'
         '  ]\n'
         "}\n\n"
         "IMPORTANT ARRAY HANDLING:\n"
@@ -86,6 +91,11 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         "- certifications_required: Return TOP 5 distinct certifications\n"
         "- process_steps: Return TOP 6 key timeline steps (avoid duplicates)\n"
         "- criticalSuccessFactors: Return TOP 3 success factors\n\n"
+        "PAGE NUMBER TRACKING:\n"
+        "- For each extracted item, try to identify the page number where it appears\n"
+        "- If the document has page numbers visible in the text, extract them\n"
+        "- If unsure about page number, set to null (don't guess)\n"
+        "- Page numbers help users verify information in source documents\n\n"
         "Document content:\n"
         f"{text}\n\n"
         "Return ONLY valid JSON (no markdown, no explanations):"
