@@ -11,7 +11,96 @@ from workers.core.errors import LLMError, RateLimitError, RetryableError, Timeou
 from workers.core.retry import RetryConfig, retry_with_backoff
 
 
+def _build_critical_fields_prompt(text: str, source_filename: str = "document") -> str:
+    """
+    Build strict extraction prompt for critical fields only.
+    Uses legal procurement logic with NO inference allowed.
+    Extracts ONLY: tender_title, organization, submission_deadline_de
+    """
+    return (
+        f"Extract CRITICAL FIELDS from this German public tender document: {source_filename}\n\n"
+        "CRITICAL FIELD EXTRACTION OVERRIDES (GERMAN PUBLIC TENDERS):\n\n"
+        "The following fields MUST be extracted using STRICT LEGAL PROCUREMENT LOGIC.\n"
+        "DO NOT guess, infer, summarize, or creatively interpret these fields.\n\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "A) Tender Title (meta.tender_title)\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "Extract the tender title ONLY if it appears explicitly as an official procurement designation.\n\n"
+        "Valid sources (descending priority):\n"
+        "1. Phrases such as:\n"
+        "   - \"Bezeichnung der Leistung\"\n"
+        "   - \"Vergabebezeichnung\"\n"
+        "   - \"Gegenstand der Ausschreibung\"\n"
+        "   - \"Titel der Ausschreibung\"\n"
+        "   - \"II.1.1 Bezeichnung des Auftrags\"\n"
+        "2. Official Bekanntmachung / EU notice sections\n"
+        "3. Formal VHB or Vergabeform documents\n\n"
+        "INVALID sources (must be ignored):\n"
+        "- File names\n"
+        "- Generic section headings\n"
+        "- Leistungsbeschreibungen without explicit title labels\n"
+        "- Marketing-style or repeated generic terms\n\n"
+        "If NO clear official tender title is explicitly stated:\n"
+        "→ Set meta.tender_title = null\n\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "B) Awarding Organization (meta.organization)\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "Extract ONLY the legally responsible awarding authority.\n\n"
+        "Valid sources:\n"
+        "1. Explicit labels:\n"
+        "   - \"Auftraggeber\"\n"
+        "   - \"Vergabestelle\"\n"
+        "   - \"Öffentlicher Auftraggeber\"\n"
+        "   - \"I.1 Name und Adressen\"\n"
+        "2. Legal entities with procurement authority (municipalities, ministries, public companies)\n\n"
+        "INVALID sources:\n"
+        "- Contractors, planners, consultants\n"
+        "- Execution partners\n"
+        "- Project stakeholders without awarding authority\n\n"
+        "If awarding authority cannot be clearly identified:\n"
+        "→ Set meta.organization = null\n\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "C) Submission Deadline (timeline_milestones.submission_deadline_de)\n"
+        "────────────────────────────────────────────────────────────────\n"
+        "Extract ONLY explicit offer submission deadlines.\n\n"
+        "Valid sources:\n"
+        "- \"Angebotsfrist\"\n"
+        "- \"Abgabefrist\"\n"
+        "- \"Schlusstermin\"\n"
+        "- \"Frist zur Angebotsabgabe\"\n"
+        "- \"IV.2.2 Schlusstermin für den Eingang der Angebote\"\n\n"
+        "INVALID sources:\n"
+        "- Project start/end dates\n"
+        "- Execution timelines\n"
+        "- Contract duration\n"
+        "- Internal milestones\n\n"
+        "Formatting:\n"
+        "- Return STRICT YYYY-MM-DD\n"
+        "- If multiple deadlines exist, choose the FINAL submission deadline\n"
+        "- If deadline is ambiguous or missing:\n"
+        "→ Set submission_deadline_de = null\n\n"
+        "────────────────────────────────────────────────────────────────\n\n"
+        "Required JSON structure (ONLY these 3 fields):\n"
+        "{\n"
+        '  "meta": {\n'
+        '    "tender_title": "Exact official title or null",\n'
+        '    "organization": "Exact awarding authority or null"\n'
+        '  },\n'
+        '  "timeline_milestones": {\n'
+        '    "submission_deadline_de": "YYYY-MM-DD or null"\n'
+        '  }\n'
+        "}\n\n"
+        "Document content:\n"
+        f"{text}\n\n"
+        "Return ONLY valid JSON (no markdown, no explanations):"
+    )
+
+
 def _build_extraction_prompt(text: str, source_filename: str = "document") -> str:
+    """
+    Build semantic extraction prompt for all fields EXCEPT critical fields.
+    Critical fields (tender_title, organization, submission_deadline_de) are extracted separately.
+    """
     return (
         f"Extract tender information from this document: {source_filename}\n\n"
         "CRITICAL EXTRACTION RULES:\n"
@@ -29,12 +118,16 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         "   - page_number: the page number where this information was found (integer or null if unknown)\n"
         "7. Prioritize QUALITY over quantity - extract only clear, actionable information\n"
         "8. For arrays: return TOP 5 most important items only (pre-filtered, deduplicated)\n\n"
+        "NOTE: The following fields are extracted separately with strict logic and should be set to null here:\n"
+        "   - meta.tender_title (extracted separately)\n"
+        "   - meta.organization (extracted separately)\n"
+        "   - timeline_milestones.submission_deadline_de (extracted separately)\n\n"
         "Required JSON structure:\n"
         "{\n"
         '  "meta": {\n'
         '    "tender_id": "ID from document or null",\n'
-        '    "tender_title": "Main tender title",\n'
-        '    "organization": "Awarding organization name",\n'
+        '    "tender_title": null,\n'
+        '    "organization": null,\n'
         f'    "source_document": "{source_filename}",\n'
         '    "page_number": null\n'
         '  },\n'
@@ -47,7 +140,7 @@ def _build_extraction_prompt(text: str, source_filename: str = "document") -> st
         '    "page_number": null\n'
         '  },\n'
         '  "timeline_milestones": {\n'
-        '    "submission_deadline_de": "YYYY-MM-DD (exact date or null)",\n'
+        '    "submission_deadline_de": null,\n'
         '    "project_duration_de": "z.B. \'6 Monate\' or null",\n'
         f'    "source_document": "{source_filename}",\n'
         '    "page_number": null\n'
@@ -119,6 +212,64 @@ def _map_openai_error(error: Exception) -> Exception:
     if "timeout" in message or "timed out" in message:
         return TimeoutError(str(error))
     return RetryableError(str(error))
+
+
+def extract_critical_fields(text: str, config: Config, source_filename: str = "document") -> dict[str, Any]:
+    """
+    Extract ONLY critical fields (tender_title, organization, submission_deadline) 
+    using strict legal procurement logic.
+    This is Stage 1 of the two-stage extraction pipeline.
+    """
+    if not config.openai_api_key or config.openai_api_key == "your_openai_api_key_here":
+        raise LLMError("OPENAI_API_KEY is not configured. Please set a valid API key in workers/.env")
+    
+    try:
+        client = OpenAI(api_key=config.openai_api_key)
+    except TypeError as exc:
+        if 'proxies' in str(exc):
+            raise LLMError(
+                "OpenAI client initialization failed. Please upgrade the openai package: "
+                "pip install --upgrade openai"
+            ) from exc
+        raise
+    
+    prompt = _build_critical_fields_prompt(text, source_filename)
+    
+    retry_config = RetryConfig(
+        max_attempts=config.max_retry_attempts,
+        base_delay_seconds=config.retry_base_delay_seconds,
+        max_delay_seconds=config.retry_max_delay_seconds,
+        retryable_exceptions=(RateLimitError, TimeoutError, RetryableError, LLMError),
+    )
+    
+    @retry_with_backoff(retry_config)
+    def _call_llm() -> str:
+        model_candidates = [
+            "gpt-5.2",
+            "gpt-5.1",
+            "gpt-4o",
+        ]
+        if config.openai_model and config.openai_model not in model_candidates:
+            model_candidates.insert(0, config.openai_model)
+        
+        last_error: Exception | None = None
+        for model in model_candidates:
+            try:
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_completion_tokens=500,  # Much smaller - only 3 fields
+                    temperature=0,
+                )
+                return response.choices[0].message.content or ""
+            except Exception as exc:  # noqa: BLE001 - keep retry behavior simple
+                last_error = exc
+                continue
+        
+        raise _map_openai_error(last_error or Exception("LLM request failed"))
+    
+    raw = _call_llm()
+    return _parse_llm_response(raw)
 
 
 def extract_tender_data(text: str, config: Config, source_filename: str = "document") -> dict[str, Any]:

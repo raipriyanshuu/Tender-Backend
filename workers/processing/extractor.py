@@ -9,7 +9,7 @@ from workers.core.errors import classify_error
 from workers.core.logging import log_context, setup_logger
 from workers.database import operations
 from workers.processing.chunking import chunk_text
-from workers.processing.llm_client import extract_tender_data
+from workers.processing.llm_client import extract_tender_data, extract_critical_fields
 from workers.processing.embeddings import select_relevant_chunks
 from workers.processing.parsers import parse_file
 from workers.utils.filesystem import resolve_storage_path
@@ -32,6 +32,46 @@ def merge_extractions(chunks_data: list[dict[str, Any]]) -> dict[str, Any]:
                 if merged[key] in (None, "", []):
                     merged[key] = value
     return merged
+
+
+def _merge_with_priority(semantic_data: dict[str, Any], critical_data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Merge semantic extraction with critical field extraction.
+    Critical fields take absolute priority over semantic fields.
+    
+    Args:
+        semantic_data: Full extraction from Stage 2 (semantic prompt)
+        critical_data: Critical fields from Stage 1 (strict prompt)
+    
+    Returns:
+        Merged dict with critical fields overriding semantic fields
+    """
+    # Start with semantic data as base
+    result = semantic_data.copy()
+    
+    # Override with critical fields (even if null - null from Stage 1 means "definitely not found")
+    if critical_data.get("meta"):
+        if "meta" not in result:
+            result["meta"] = {}
+        
+        # Override tender_title if present in critical_data
+        if "tender_title" in critical_data["meta"]:
+            result["meta"]["tender_title"] = critical_data["meta"]["tender_title"]
+        
+        # Override organization if present in critical_data
+        if "organization" in critical_data["meta"]:
+            result["meta"]["organization"] = critical_data["meta"]["organization"]
+    
+    if critical_data.get("timeline_milestones"):
+        if "timeline_milestones" not in result:
+            result["timeline_milestones"] = {}
+        
+        # Override submission_deadline_de if present in critical_data
+        if "submission_deadline_de" in critical_data["timeline_milestones"]:
+            result["timeline_milestones"]["submission_deadline_de"] = critical_data["timeline_milestones"]["submission_deadline_de"]
+    
+    return result
+
 
 
 def process_file(session: Session, doc_id: str, config: Config) -> None:
@@ -97,11 +137,35 @@ def process_file(session: Session, doc_id: str, config: Config) -> None:
                 source_filename=source_filename,
             )
             chunks_for_llm = selected_chunks or chunks
-            chunk_results = [
+            
+            # ============================================================
+            # TWO-STAGE EXTRACTION PIPELINE
+            # ============================================================
+            
+            # STAGE 1: Extract critical fields with STRICT legal logic
+            # Fields: tender_title, organization, submission_deadline_de
+            logger.info(f"[Stage 1] Extracting critical fields with strict logic from {len(chunks_for_llm)} chunks...")
+            critical_results = [
+                extract_critical_fields(chunk, config, source_filename)
+                for chunk in chunks_for_llm
+            ]
+            critical_merged = merge_extractions(critical_results)
+            logger.info(f"[Stage 1] Critical fields extracted: {critical_merged.get('meta', {}).keys()}")
+            
+            # STAGE 2: Extract remaining fields with SEMANTIC logic
+            # All other fields (risks, requirements, etc.)
+            logger.info(f"[Stage 2] Extracting remaining fields with semantic logic from {len(chunks_for_llm)} chunks...")
+            semantic_results = [
                 extract_tender_data(chunk, config, source_filename)
                 for chunk in chunks_for_llm
             ]
-            final_extraction = merge_extractions(chunk_results)
+            semantic_merged = merge_extractions(semantic_results)
+            logger.info(f"[Stage 2] Semantic fields extracted")
+            
+            # STAGE 3: Merge with priority to critical fields
+            logger.info("[Stage 3] Merging results (critical fields take priority)...")
+            final_extraction = _merge_with_priority(semantic_merged, critical_merged)
+            logger.info("[Stage 3] Merge complete")
 
             operations.mark_file_success(session, doc_id, final_extraction)
             logger.info(f"Successfully processed {doc_id}")
