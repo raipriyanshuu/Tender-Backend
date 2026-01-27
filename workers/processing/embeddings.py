@@ -2,11 +2,27 @@ from __future__ import annotations
 
 import math
 import os
+import re
+import unicodedata
 from typing import Iterable, Sequence
 
 from openai import OpenAI
 
 from workers.config import Config
+
+
+def normalize(text: str) -> str:
+    """Normalize text for comparison: lowercase, remove accents, clean legal terms."""
+    text = text.lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+
+    # German legal cleanup
+    text = re.sub(r"§\s*\d+[a-zA-Z]*", " paragraph ", text)
+    text = re.sub(r"\b(vob/a|vob/b|uvg|gwb)\b", " vergaberecht ", text)
+
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
 
 def _cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
@@ -378,22 +394,6 @@ def select_relevant_chunks(
     }
 }
 
-
-    import unicodedata
-import re
-
-def normalize(text: str) -> str:
-    text = text.lower()
-    text = unicodedata.normalize("NFKD", text)
-    text = text.encode("ascii", "ignore").decode("ascii")
-
-    # German legal cleanup
-    text = re.sub(r"§\s*\d+[a-zA-Z]*", " paragraph ", text)
-    text = re.sub(r"\b(vob/a|vob/b|uvg|gwb)\b", " vergaberecht ", text)
-
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
     try:
         client = OpenAI(api_key=config.openai_api_key)
         chunk_embeddings = _embed_texts(client, model, chunks)
@@ -453,8 +453,10 @@ def normalize(text: str) -> str:
         def coverage_score(text: str) -> set[str]:
             lowered = normalize(text)
             covered = set()
-            for topic, terms in topic_terms.items():
-                if any(term in lowered for term in terms):
+            for topic, term_dict in topic_terms.items():
+                # Handle new structure with positive/negative terms
+                positive_terms = term_dict.get("positive", [])
+                if any(term in lowered for term in positive_terms):
                     covered.add(topic)
             return covered
 
