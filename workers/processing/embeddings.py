@@ -56,53 +56,343 @@ def select_relevant_chunks(
     top_k = max(1, min(top_k, len(chunks)))
 
     multi_queries = [
-        "Zuschlagskriterien und Bewertungskriterien",
-        "Vertragsstrafe, Vertragsstrafen, Sanktionen",
-        "Tariftreue, Mindestentgelt, Lohn",
-        "Datenschutz, DSGVO, Datenverarbeitung",
-        "Fristen, Abgabefrist, Angebotsfrist, Termine",
-        "Nebenangebote, Alternativangebote, Varianten",
-        "Formblatt, Eignung, Nachweise, Referenzen",
-        "Ausführungsbeginn, Bauzeit, Leistungsbeginn",
-        "Wirtschaftlichkeit, Kosten, Preisprüfung",
-        "Risiken, Haftung, Vertragsrisiko",
-    ]
+    # Award & evaluation
+    "Zuschlagskriterien und deren Gewichtung gemäß Vergabeunterlagen",
+    "Bewertung der Angebote nach Preis und Qualität",
+    "Wertung der Angebote nach VOB/A",
+
+    # Penalties & contract risks
+    "Vertragsstrafen bei Fristüberschreitung oder Leistungsstörungen",
+    "Sanktionen bei Nichteinhaltung vertraglicher Pflichten",
+
+    # Labour & compliance
+    "Tariftreueerklärung und Mindestentgelt gemäß geltendem Tarifrecht",
+    "Verpflichtung zur Einhaltung von Mindestlohnvorschriften",
+
+    # Data protection
+    "Datenschutz und Verarbeitung personenbezogener Daten gemäß DSGVO",
+    "Auftragsverarbeitung und Vertraulichkeit",
+
+    # Deadlines
+    "Frist zur Angebotsabgabe und Schlusstermin",
+    "Abgabefrist für Angebote einschließlich Uhrzeit",
+
+    # Variants
+    "Zulässigkeit von Nebenangeboten oder Alternativangeboten",
+    "Bedingungen für Variantenangebote",
+
+    # Eligibility
+    "Eignungsnachweise, Referenzen und Formblätter",
+    "Nachweise zur technischen und wirtschaftlichen Leistungsfähigkeit",
+
+    # Execution
+    "Ausführungsbeginn, Bauzeit und Leistungsfristen",
+    "Zeitplan für die Ausführung der Leistungen",
+
+    # Economics
+    "Wirtschaftlichkeit der Angebote und Preisprüfung",
+    "Prüfung ungewöhnlich niedriger Angebote",
+
+    # Risks
+    "Vertragsrisiken, Haftung und Gewährleistung"
+]
+
 
     keyword_terms = [
-        "Zuschlagskriterien",
-        "Vertragsstrafe",
-        "Tariftreue",
-        "Mindestentgelt",
-        "DSGVO",
-        "Nebenangebote",
-        "Formblatt",
-        "Eignung",
-        "Abgabefrist",
-        "Angebotsfrist",
-        "Ausführungsbeginn",
-        "Bauzeit",
-        "Wirtschaftlichkeit",
-        "Preisprüfung",
-        "Zertifikat",
-        "Zertifizierung",
-        "Risiko",
-    ]
+    # Award
+    "zuschlagskriterien", "wertung", "gewichtung", "bewertungsmatrix",
+
+    # Contract penalties
+    "vertragsstrafe", "vertragsstrafen", "pönale", "sanktion",
+
+    # Labour law
+    "tariftreue", "mindestentgelt", "mindestlohn", "tarifvertrag",
+
+    # Data protection
+    "dsgvo", "datenschutz", "auftragsverarbeitung", "vertraulichkeit",
+
+    # Deadlines
+    "abgabefrist", "angebotsfrist", "schlusstermin", "einreichungsfrist",
+
+    # Variants
+    "nebenangebot", "alternativangebot", "variante",
+
+    # Eligibility
+    "formblatt", "eignung", "nachweis", "referenz", "präqualifikation",
+
+    # Execution
+    "ausführungsbeginn", "leistungsbeginn", "bauzeit", "fertigstellung",
+
+    # Economics
+    "wirtschaftlichkeit", "preisprüfung", "angebotspreis",
+    "ungewöhnlich niedriges angebot",
+
+    # Risk
+    "haftung", "vertragsrisiko", "gewährleistung", "mängel"
+]
+
 
     topic_terms = {
-        "zuschlag": ["zuschlagskriterien", "bewertungskriterien", "wertung"],
-        "vertragsstrafe": ["vertragsstrafe", "vertragsstrafen", "sanktion"],
-        "tariftreue": ["tariftreue", "mindestentgelt", "tarif"],
-        "datenschutz": ["dsgvo", "datenschutz", "datenverarbeitung"],
-        "fristen": ["frist", "abgabefrist", "angebotsfrist", "termin"],
-        "nebenangebote": ["nebenangebot", "alternativangebot", "variante"],
-        "eignung": ["formblatt", "eignung", "nachweis", "referenz"],
-        "ausfuehrung": ["ausführungsbeginn", "leistungsbeginn", "bauzeit", "ausführung"],
-        "wirtschaftlichkeit": ["wirtschaftlichkeit", "kosten", "preisprüfung", "preis"],
-        "risiken": ["risiko", "haftung", "vertragsrisiko"],
-    }
 
-    def normalize(text: str) -> str:
-        return text.lower()
+    # ─────────────────────────────────────────
+    # AWARD & EVALUATION
+    # ─────────────────────────────────────────
+    "zuschlag": {
+        "positive": [
+            "zuschlagskriterien",
+            "bewertungskriterien",
+            "wertung",
+            "gewichtung",
+            "bewertungsmatrix",
+            "zuschlagsentscheidung",
+            "angebotspunktzahl",
+            "preis gewichtung",
+            "qualitaetsbewertung"
+        ],
+        "negative": [
+            "angebotspreis",
+            "rechnungsbetrag",
+            "abschlagszahlung"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # CONTRACT PENALTIES & SANCTIONS
+    # ─────────────────────────────────────────
+    "vertragsstrafe": {
+        "positive": [
+            "vertragsstrafe",
+            "vertragsstrafen",
+            "pönale",
+            "sanktion",
+            "verzugsschaden",
+            "fristueberschreitung",
+            "terminueberschreitung"
+        ],
+        "negative": [
+            "schadensersatz allgemein",
+            "haftung allgemein"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # LABOUR LAW / TARIFF COMPLIANCE
+    # ─────────────────────────────────────────
+    "tariftreue": {
+        "positive": [
+            "tariftreue",
+            "tariftreueerklaerung",
+            "mindestentgelt",
+            "mindestlohn",
+            "tarifvertrag",
+            "entgeltregelung",
+            "lohnbindung"
+        ],
+        "negative": [
+            "angebotspreis",
+            "kalkulation"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # DATA PROTECTION / GDPR
+    # ─────────────────────────────────────────
+    "datenschutz": {
+        "positive": [
+            "dsgvo",
+            "datenschutz",
+            "datenverarbeitung",
+            "personenbezogene daten",
+            "auftragsverarbeitung",
+            "vertraulichkeit",
+            "datensicherheit"
+        ],
+        "negative": [
+            "betriebsgeheimnis ohne personenbezogene daten"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # SUBMISSION DEADLINES (CRITICAL)
+    # ─────────────────────────────────────────
+    "fristen": {
+        "positive": [
+            "abgabefrist",
+            "angebotsfrist",
+            "schlusstermin",
+            "frist zur angebotsabgabe",
+            "eingang der angebote",
+            "abgabedatum"
+        ],
+        "negative": [
+            "ausfuehrungsbeginn",
+            "bauzeit",
+            "leistungsbeginn",
+            "fertigstellung",
+            "veroeffentlichungsdatum"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # VARIANTS / ALTERNATIVE OFFERS
+    # ─────────────────────────────────────────
+    "nebenangebote": {
+        "positive": [
+            "nebenangebot",
+            "nebenangebote",
+            "alternativangebot",
+            "alternativangebote",
+            "variante",
+            "variantenangebote"
+        ],
+        "negative": [
+            "hauptangebot",
+            "grundangebot"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # ELIGIBILITY / SUITABILITY
+    # ─────────────────────────────────────────
+    "eignung": {
+        "positive": [
+            "eignung",
+            "eignungsnachweis",
+            "eignungskriterien",
+            "nachweise",
+            "referenzen",
+            "präqualifikation",
+            "formblatt",
+            "selbstauskunft"
+        ],
+        "negative": [
+            "leistungsbeschreibung",
+            "ausfuehrungsdetails"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # EXECUTION PERIOD / CONSTRUCTION TIME
+    # ─────────────────────────────────────────
+    "ausfuehrung": {
+        "positive": [
+            "ausfuehrungsbeginn",
+            "leistungsbeginn",
+            "bauzeit",
+            "ausfuehrungsfrist",
+            "fertigstellung",
+            "ausfuehrungszeitraum"
+        ],
+        "negative": [
+            "abgabefrist",
+            "angebotsfrist",
+            "schlusstermin"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # ECONOMIC EVALUATION / PRICE CHECK
+    # ─────────────────────────────────────────
+    "wirtschaftlichkeit": {
+        "positive": [
+            "wirtschaftlichkeit",
+            "preispruefung",
+            "angebotspreis",
+            "kalkulation",
+            "kostenstruktur",
+            "ungewoehnlich niedriges angebot",
+            "preisangemessenheit"
+        ],
+        "negative": [
+            "abschlagszahlung",
+            "schlussrechnung"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # RISKS / LIABILITY
+    # ─────────────────────────────────────────
+    "risiken": {
+        "positive": [
+            "risiko",
+            "vertragsrisiko",
+            "haftung",
+            "gewaehrleistung",
+            "maengel",
+            "schadensersatz",
+            "haftungsumfang"
+        ],
+        "negative": [
+            "allgemeine hinweise ohne verpflichtung"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # CERTIFICATES / APPROVALS
+    # ─────────────────────────────────────────
+    "zertifikate": {
+        "positive": [
+            "zertifikat",
+            "zertifizierung",
+            "iso",
+            "qualitaetsmanagement",
+            "sicherheitszertifikat",
+            "nachweis der zertifizierung"
+        ],
+        "negative": [
+            "herstellerangaben ohne nachweis"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # SAFETY / OCCUPATIONAL HEALTH
+    # ─────────────────────────────────────────
+    "sicherheit": {
+        "positive": [
+            "arbeitssicherheit",
+            "sicherheitsvorschriften",
+            "gesundheitsschutz",
+            "gefaehrdungsbeurteilung",
+            "schutzmassnahmen",
+            "baustellensicherheit"
+        ],
+        "negative": [
+            "allgemeine empfehlungen"
+        ]
+    },
+
+    # ─────────────────────────────────────────
+    # CONTRACTUAL TERMS
+    # ─────────────────────────────────────────
+    "vertrag": {
+        "positive": [
+            "vertragsbedingungen",
+            "besondere vertragsbedingungen",
+            "agb",
+            "vob/b",
+            "vertragsbestandteil"
+        ],
+        "negative": [
+            "leistungsbeschreibung ohne rechtswirkung"
+        ]
+    }
+}
+
+
+    import unicodedata
+import re
+
+def normalize(text: str) -> str:
+    text = text.lower()
+    text = unicodedata.normalize("NFKD", text)
+    text = text.encode("ascii", "ignore").decode("ascii")
+
+    # German legal cleanup
+    text = re.sub(r"§\s*\d+[a-zA-Z]*", " paragraph ", text)
+    text = re.sub(r"\b(vob/a|vob/b|uvg|gwb)\b", " vergaberecht ", text)
+
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
     try:
         client = OpenAI(api_key=config.openai_api_key)
